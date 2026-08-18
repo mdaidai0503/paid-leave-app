@@ -241,7 +241,13 @@ function badge(s){const c=s==='承認'?'approved':s==='却下'?'rejected':'pendi
 function isAdmin(){return mode==='local'||profile?.role==='admin'}
 function currentEmail(){return session?.user?.email||profile?.email||''}
 
-function apiHeaders(extra={}){return {'apikey':cfg.key,'Authorization':`Bearer ${session?.access_token||cfg.key}`,'Content-Type':'application/json',...extra}}
+function apiHeaders(extra={}){
+  const h={'apikey':cfg.key,'Content-Type':'application/json'};
+  // 新しい sb_publishable_... キーは Authorization: Bearer には入れない。
+  // ログイン後のみ、ユーザーの access_token を Authorization に使用する。
+  if(session?.access_token) h['Authorization']=`Bearer ${session.access_token}`;
+  return {...h,...extra};
+}
 async function sbFetch(path,opt={}){
   cfg=normalizeConfigObject(safeJson(localStorage.getItem(CFGKEY),cfg||{}));
   if(!cfg.url || !cfg.key) throw new Error('Supabase接続設定がありません');
@@ -281,8 +287,12 @@ async function testCloud(){
     return;
   }
   try{
-    const r=await fetch(url+'/rest/v1/',{headers:{apikey:key}});
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    // Auth settings は Publishable key の疎通確認に適したエンドポイント。
+    const r=await fetch(url+'/auth/v1/settings',{headers:{apikey:key}});
+    if(!r.ok){
+      const t=await r.text();
+      throw new Error(t||('HTTP '+r.status));
+    }
     cfg={url,key};
     localStorage.setItem(CFGKEY,JSON.stringify(cfg));
     localStorage.setItem('paidLeaveCloudConfigV5',JSON.stringify(cfg));
