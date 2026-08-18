@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2f5b">
 <link rel="manifest" href="manifest.webmanifest">
-<title>有給休暇管理 v5.3</title>
+<title>有給休暇管理 v5.4</title>
 <style>
 :root{--navy:#0b2f5b;--bg:#f5f7fb;--line:#d9e0ea;--ok:#e9f7ef;--warn:#fff7df;--bad:#fdecec;--text:#172033}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -28,7 +28,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 </style>
 </head>
 <body>
-<header>有給休暇管理 v5.3</header>
+<header>有給休暇管理 v5.4</header>
 <main>
 
 <div id="authBar" class="authbar hidden no-print">
@@ -135,7 +135,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <h3 style="margin-top:0">クラウド接続設定</h3>
   <div class="grid"><div><label>Supabase Project URL</label><input id="sbUrl" placeholder="https://xxxxx.supabase.co"></div><div><label>Supabase anon key</label><textarea id="sbKey" style="min-height:100px"></textarea></div></div>
   <div class="actions" style="margin-top:11px"><button class="primary" onclick="saveCloudConfig()">保存</button><button class="ghost" onclick="testCloud()">接続テスト</button><button class="ghost" onclick="showView('loginView')">ログインへ戻る</button></div>
-  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.3では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
+  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.4では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
  </div>
  <div class="card">
   <h3 style="margin-top:0">ローカルデータ移行</h3>
@@ -161,6 +161,9 @@ const CFGKEY='paidLeaveCloudConfig';
 const LOCALKEY='paidLeaveLocal';
 const LEGACY='paidLeaveAppV3';
 const SESSIONKEY='paidLeaveSession';
+function safeJson(raw,fallback={}){
+  try{return raw?JSON.parse(raw):fallback}catch(e){return fallback}
+}
 
 function normalizeConfigObject(obj){
   if(!obj || typeof obj!=='object') return {};
@@ -225,7 +228,7 @@ function migratePersistentSettings(){
 }
 migratePersistentSettings();
 
-let cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||'{}'));
+let cfg=normalizeConfigObject(safeJson(localStorage.getItem(CFGKEY),{}));
 let session=null, profile=null, mode='cloud';
 let state={employees:[],requests:[],notifications:[],fiveDayTarget:5};
 let calCursor=new Date();
@@ -240,10 +243,18 @@ function currentEmail(){return session?.user?.email||profile?.email||''}
 
 function apiHeaders(extra={}){return {'apikey':cfg.key,'Authorization':`Bearer ${session?.access_token||cfg.key}`,'Content-Type':'application/json',...extra}}
 async function sbFetch(path,opt={}){
-  cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||JSON.stringify(cfg||{})));
+  cfg=normalizeConfigObject(safeJson(localStorage.getItem(CFGKEY),cfg||{}));
   if(!cfg.url || !cfg.key) throw new Error('Supabase接続設定がありません');
   const base=cfg.url.replace(/\/+$/,'');
-  const r=await fetch(base+path,{...opt,headers:{...apiHeaders(),...(opt.headers||{})}});
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),12000);
+  let r;
+  try{
+    r=await fetch(base+path,{...opt,signal:controller.signal,headers:{...apiHeaders(),...(opt.headers||{})}});
+  }catch(e){
+    if(e?.name==='AbortError') throw new Error('Supabaseへの接続がタイムアウトしました');
+    throw e;
+  }finally{clearTimeout(timer)}
   const text=await r.text();
   if(!r.ok) throw new Error(text||`HTTP ${r.status}`);
   return text?JSON.parse(text):null
@@ -280,9 +291,9 @@ async function testCloud(){
   }catch(e){
     alert('接続できませんでした: '+(e?.message||e));
   }
-}});alert('接続先に到達しました。')}catch(e){alert('接続できませんでした: '+e.message)}}
+}
 function updateCloudStatus(){
-  cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||'{}'));
+  cfg=normalizeConfigObject(safeJson(localStorage.getItem(CFGKEY),{}));
   $('sbUrl').value=cfg.url||'';
   $('sbKey').value=cfg.key||'';
   $('cloudStatus').textContent=(cfg.url&&cfg.key)
@@ -300,7 +311,7 @@ async function signup(){
  try{
   const data=await sbFetch('/auth/v1/signup',{method:'POST',body:JSON.stringify({email:$('loginEmail').value.trim(),password:$('loginPassword').value})});
   alert(data?.session?'登録しました。ログイン状態になりました。':'登録しました。確認メールが必要な設定の場合はメールを確認してください。');
-  if(data?.session){session=data.session;localStorage.setItem('paidLeaveSessionV4',JSON.stringify(session));await ensureEmployeeProfile();await loadProfile();await syncNow();enterApp()}
+  if(data?.session){session=data.session;localStorage.setItem(SESSIONKEY,JSON.stringify(session));localStorage.setItem('paidLeaveSessionV5',JSON.stringify(session));await ensureEmployeeProfile();await loadProfile();await syncNow();enterApp()}
  }catch(e){alert('登録できませんでした: '+cleanErr(e))}
 }
 function logout(){
@@ -428,10 +439,26 @@ async function runAnnualCarryover(){if(!isAdmin())return;const y=new Date().getF
 function renderAll(){renderHome();renderApply();renderStatus();renderCalendar();renderEmployees();renderAdmin();renderNotifCount()}
 
 (async function init(){
- updateCloudStatus();
- const saved=localStorage.getItem(SESSIONKEY);
- if(saved&&cfg.url&&cfg.key){try{session=JSON.parse(saved);mode='cloud';await loadProfile();await syncNow();enterApp();return}catch(e){console.warn(e)}}
- showView('loginView')
+ try{
+  updateCloudStatus();
+  const saved=localStorage.getItem(SESSIONKEY);
+  if(saved&&cfg.url&&cfg.key){
+   try{
+    session=safeJson(saved,null);
+    if(session?.access_token){mode='cloud';await loadProfile();await syncNow();enterApp();return}
+   }catch(e){
+    console.warn('自動ログインに失敗しました',e);
+    session=null;
+    localStorage.removeItem(SESSIONKEY);
+    if($('cloudStatus')) $('cloudStatus').textContent='接続設定は読み込み済みです。ログインしてください。';
+   }
+  }
+  showView('loginView');
+ }catch(e){
+  console.error('初期化エラー',e);
+  if($('cloudStatus')) $('cloudStatus').textContent='初期化中にエラーが発生しました。接続設定を確認してください。';
+  showView('loginView');
+ }
 })();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js');
 </script>
