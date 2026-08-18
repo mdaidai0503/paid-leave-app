@@ -1,3 +1,8 @@
+/* 有給休暇管理 v5.4 - Service Worker 修正版
+   Supabaseなど外部API通信は一切横取りしません。
+   同一オリジンのGETのみを扱い、null Responseを返さない安全版です。
+*/
+
 const CACHE_NAME = 'paid-leave-v5.4-swfix-20260819';
 
 // GitHub Pages上で同じ階層にある基本ファイルだけを対象にします。
