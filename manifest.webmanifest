@@ -1,0 +1,9 @@
+{
+  "name": "有給休暇管理",
+  "short_name": "有給休暇",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#0b2f5b",
+  "description": "従業員管理・時間単位休暇・通知・年度繰越・5日取得管理対応"
+}
