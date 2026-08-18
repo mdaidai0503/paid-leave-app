@@ -5,5 +5,5 @@
   "display": "standalone",
   "background_color": "#f5f7fb",
   "theme_color": "#0b2f5b",
-  "description": "有給休暇の申請・承認・年間管理を行う社内用PWA"
+  "description": "複数端末共有・ログイン対応の有給休暇申請承認PWA"
 }
