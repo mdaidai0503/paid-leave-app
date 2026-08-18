@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2f5b">
 <link rel="manifest" href="manifest.webmanifest">
-<title>有給休暇管理 v4</title>
+<title>有給休暇管理 v5</title>
 <style>
 :root{--navy:#0b2f5b;--bg:#f5f7fb;--line:#d9e0ea;--ok:#e9f7ef;--warn:#fff7df;--bad:#fdecec;--text:#172033}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -28,12 +28,12 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 </style>
 </head>
 <body>
-<header>有給休暇管理 v4</header>
+<header>有給休暇管理 v5</header>
 <main>
 
 <div id="authBar" class="authbar hidden no-print">
  <div><b id="authName"></b> <span id="authRole" class="badge"></span></div>
- <div class="actions"><button class="ghost" onclick="syncNow()">同期</button><button class="ghost" onclick="logout()">ログアウト</button></div>
+ <div class="actions"><button class="ghost" onclick="showView('notificationsView')">🔔 <span id="notifCount">0</span></button><button class="ghost" onclick="syncNow()">同期</button><button class="ghost" onclick="logout()">ログアウト</button></div>
 </div>
 
 <section id="loginView">
@@ -71,9 +71,11 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
    <div><label>従業員</label><select id="applyEmployee" onchange="refreshApplyBalance()"></select></div>
    <div><label>現在の利用可能残数</label><input id="applyBalance" readonly></div>
    <div><label>取得日</label><input id="leaveDate" type="date"></div>
-   <div><label>区分</label><select id="leaveType"><option value="1">1日</option><option value="0.5">半日</option></select></div>
+   <div><label>区分</label><select id="leaveUnit" onchange="toggleHourInput()"><option value="day">1日</option><option value="half">半日</option><option value="hour">時間単位</option></select></div>
+<div id="hourWrap" class="hidden"><label>取得時間</label><input id="leaveHours" type="number" min="0.5" step="0.5" value="1" oninput="updatePreview()"></div>
   </div>
-  <div style="margin-top:11px"><label>理由（任意）</label><textarea id="reason" placeholder="例：私用のため"></textarea></div>
+  <div id="equivPreview" class="notice">日数換算：1日</div>
+<div style="margin-top:11px"><label>理由（任意）</label><textarea id="reason" placeholder="例：私用のため"></textarea></div>
   <div class="actions" style="margin-top:11px"><button class="primary" onclick="submitLeave()">申請する</button></div>
  </div>
 </section>
@@ -81,7 +83,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 <section id="statusView" class="hidden">
  <div class="card">
   <div class="section-title"><h3 style="margin:0">申請状況</h3><select id="statusEmployeeFilter" onchange="renderStatus()" style="width:auto"></select></div>
-  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>取得日</th><th>氏名</th><th>所属</th><th>区分</th><th>状態</th><th>理由</th><th>操作</th></tr></thead><tbody id="statusBody"></tbody></table></div>
+  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>取得日</th><th>氏名</th><th>所属</th><th>区分</th><th>日数換算</th><th>状態</th><th>理由</th><th>操作</th></tr></thead><tbody id="statusBody"></tbody></table></div>
  </div>
 </section>
 
@@ -100,12 +102,20 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
    <input type="hidden" id="editEmployeeId">
    <div class="grid3">
     <div><label>氏名</label><input id="empName"></div><div><label>所属</label><input id="empDept"></div><div><label>メール</label><input id="empEmail" type="email"></div>
-    <div><label>入社日</label><input id="empHireDate" type="date"></div><div><label>前年繰越</label><input id="empCarry" type="number" min="0" step="0.5" value="0"></div><div><label>今年付与</label><input id="empGrant" type="number" min="0" step="0.5" value="10"></div>
+    <div><label>入社日</label><input id="empHireDate" type="date"></div><div><label>1日の所定時間</label><input id="empDailyHours" type="number" min="1" step="0.5" value="8"></div><div><label>付与年度</label><input id="empGrantYear" type="number" min="2020" max="2100"></div>
+<div><label>前年繰越</label><input id="empCarry" type="number" min="0" step="0.125" value="0"></div><div><label>今年付与</label><input id="empGrant" type="number" min="0" step="0.5" value="10"></div>
     <div><label>次回付与日</label><input id="empNextGrant" type="date"></div><div><label>次回付与日数</label><input id="empNextGrantDays" type="number" min="0" step="0.5" value="10"></div>
    </div>
    <div class="actions" style="margin-top:10px"><button class="primary" onclick="saveEmployee()">保存</button><button class="ghost" onclick="closeEmployeeForm()">キャンセル</button></div>
   </div>
-  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>氏名</th><th>所属</th><th>メール</th><th>前年繰越</th><th>今年付与</th><th>取得</th><th>残数</th><th>5日取得</th><th>次回付与</th><th>操作</th></tr></thead><tbody id="employeeBody"></tbody></table></div>
+  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>氏名</th><th>所属</th><th>入社日</th><th>所定時間</th><th>前年繰越</th><th>今年付与</th><th>取得</th><th>残数</th><th>5日取得</th><th>次回付与</th><th>操作</th></tr></thead><tbody id="employeeBody"></tbody></table></div>
+ </div>
+</section>
+
+<section id="notificationsView" class="hidden">
+ <div class="card">
+  <div class="section-title"><h3 style="margin:0">通知</h3><button class="ghost" onclick="markAllRead()">すべて既読</button></div>
+  <div id="notificationsList"></div>
  </div>
 </section>
 
@@ -116,6 +126,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <div id="annualSummary" style="margin-top:12px"></div>
   <h4>従業員別 5日取得状況</h4>
   <div class="table-wrap"><table><thead><tr><th>氏名</th><th>所属</th><th>承認済み取得</th><th>5日まで</th><th>進捗</th></tr></thead><tbody id="fiveDayBody"></tbody></table></div>
+  <div class="actions admin-only" style="margin-top:12px"><button class="secondary" onclick="runAnnualCarryover()">年度繰越を実行</button></div>
  </div>
 </section>
 
@@ -149,7 +160,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 const CFGKEY='paidLeaveCloudConfigV4', LOCALKEY='paidLeaveLocalV4', LEGACY='paidLeaveAppV3';
 let cfg=JSON.parse(localStorage.getItem(CFGKEY)||'{}');
 let session=null, profile=null, mode='cloud';
-let state={employees:[],requests:[],fiveDayTarget:5};
+let state={employees:[],requests:[],notifications:[],fiveDayTarget:5};
 let calCursor=new Date();
 
 const $=id=>document.getElementById(id);
@@ -199,20 +210,22 @@ async function ensureEmployeeProfile(){
 async function syncNow(){
  try{
   if(mode==='local'){localStorage.setItem(LOCALKEY,JSON.stringify(state));renderAll();return}
-  const [emps,reqs,settings]=await Promise.all([
+  const [emps,reqs,settings,notifs]=await Promise.all([
    sbFetch('/rest/v1/employees?select=*&order=name.asc'),
    sbFetch('/rest/v1/leave_requests?select=*&order=created_at.desc'),
-   sbFetch('/rest/v1/app_settings?id=eq.1&select=*')
+   sbFetch('/rest/v1/app_settings?id=eq.1&select=*'),
+   sbFetch('/rest/v1/notifications?select=*&order=created_at.desc')
   ]);
-  state.employees=(emps||[]).map(e=>({id:e.id,name:e.name,dept:e.dept||'',email:e.email||'',hireDate:e.hire_date||'',carryover:Number(e.carryover||0),currentGrant:Number(e.current_grant||0),nextGrantDate:e.next_grant_date||'',nextGrantDays:Number(e.next_grant_days||0)}));
-  state.requests=(reqs||[]).map(r=>({id:r.id,employeeId:r.employee_id,name:r.employee_name,dept:r.dept||'',date:r.leave_date,type:Number(r.leave_type),reason:r.reason||'',status:r.status,createdAt:r.created_at,approvedAt:r.approved_at,cancelled:r.cancelled||false}));
-  state.fiveDayTarget=Number(settings?.[0]?.five_day_target||5);renderAll()
+  state.employees=(emps||[]).map(e=>({id:e.id,name:e.name,dept:e.dept||'',email:e.email||'',hireDate:e.hire_date||'',dailyHours:Number(e.daily_work_hours||8),grantYear:Number(e.grant_year||new Date().getFullYear()),carryover:Number(e.carryover||0),currentGrant:Number(e.current_grant||0),nextGrantDate:e.next_grant_date||'',nextGrantDays:Number(e.next_grant_days||0)}));
+  state.requests=(reqs||[]).map(r=>({id:r.id,employeeId:r.employee_id,name:r.employee_name,dept:r.dept||'',date:r.leave_date,unit:r.leave_unit||'day',hours:Number(r.leave_hours||0),equiv:Number(r.equivalent_days||r.leave_type||1),reason:r.reason||'',status:r.status,createdAt:r.created_at,approvedAt:r.approved_at,cancelled:r.cancelled||false}));
+  state.fiveDayTarget=Number(settings?.[0]?.five_day_target||5);state.notifications=notifs||[];renderAll()
  }catch(e){console.error(e);alert('同期に失敗しました: '+cleanErr(e))}
 }
-function showView(id){['loginView','homeView','applyView','statusView','calendarView','employeesView','adminView','settingsView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='homeView')renderHome();if(id==='applyView')renderApply();if(id==='statusView')renderStatus();if(id==='calendarView')renderCalendar();if(id==='employeesView')renderEmployees();if(id==='adminView')renderAdmin();if(id==='settingsView')updateCloudStatus()}
+function showView(id){['loginView','homeView','applyView','statusView','calendarView','employeesView','notificationsView','adminView','settingsView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='homeView')renderHome();if(id==='applyView')renderApply();if(id==='statusView')renderStatus();if(id==='calendarView')renderCalendar();if(id==='employeesView')renderEmployees();if(id==='notificationsView')renderNotifications();if(id==='adminView')renderAdmin();if(id==='settingsView')updateCloudStatus()}
 function employeeById(id){return state.employees.find(e=>e.id===id)}
 function approvedForEmployee(id,year=null){return state.requests.filter(r=>r.employeeId===id&&r.status==='承認'&&!r.cancelled&&(!year||r.date.startsWith(year+'-')))}
-function usedDays(id,year=null){return approvedForEmployee(id,year).reduce((a,r)=>a+Number(r.type||0),0)}
+function usedDays(id,year=null){return approvedForEmployee(id,year).reduce((a,r)=>a+Number(r.equiv||0),0)}
+function leaveLabel(r){if(r.unit==='half')return'半日';if(r.unit==='hour')return`${r.hours}時間`;return'1日'}
 function balance(e){return Number(e.carryover||0)+Number(e.currentGrant||0)-usedDays(e.id)}
 
 function visibleEmployees(){
@@ -223,11 +236,11 @@ function visibleRequests(){if(isAdmin())return state.requests;const ids=new Set(
 function renderHome(){
  const today=isoToday(),ym=today.slice(0,7),year=Number(today.slice(0,4)),vr=visibleRequests(),ve=visibleEmployees();
  const pending=vr.filter(r=>r.status==='承認待ち'&&!r.cancelled).length,todays=state.requests.filter(r=>r.status==='承認'&&!r.cancelled&&r.date===today);
- const monthDays=vr.filter(r=>r.status==='承認'&&!r.cancelled&&r.date.startsWith(ym)).reduce((a,r)=>a+Number(r.type||0),0);
+ const monthDays=vr.filter(r=>r.status==='承認'&&!r.cancelled&&r.date.startsWith(ym)).reduce((a,r)=>a+Number(r.equiv||0),0);
  const under=ve.filter(e=>usedDays(e.id,year)<state.fiveDayTarget).length;
  $('dashPending').textContent=pending;$('dashToday').textContent=todays.length;$('dashMonth').textContent=monthDays;$('dashFive').textContent=under;$('todayLabel').textContent=today;
- $('todayList').innerHTML=todays.length?todays.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #edf1f6"><b>${esc(r.name)}</b>　${esc(r.dept)}　${typeLabel(r.type)}</div>`).join(''):'該当者はいません。';
- const recent=vr.filter(r=>!r.cancelled).slice(0,6);$('recentList').innerHTML=recent.length?recent.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #edf1f6"><b>${r.date}</b>　${esc(r.name)}　${typeLabel(r.type)}　${badge(r.status)}</div>`).join(''):'申請はありません。'
+ $('todayList').innerHTML=todays.length?todays.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #edf1f6"><b>${esc(r.name)}</b>　${esc(r.dept)}　${leaveLabel(r)}</div>`).join(''):'該当者はいません。';
+ const recent=vr.filter(r=>!r.cancelled).slice(0,6);$('recentList').innerHTML=recent.length?recent.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #edf1f6"><b>${r.date}</b>　${esc(r.name)}　${leaveLabel(r)}　${badge(r.status)}</div>`).join(''):'申請はありません。'
 }
 function renderApply(){
  const es=visibleEmployees();$('applyEmployee').innerHTML=es.length?es.map(e=>`<option value="${e.id}">${esc(e.name)}（${esc(e.dept||'')}）</option>`).join(''):'<option value="">従業員登録が必要です</option>';
@@ -235,29 +248,26 @@ function renderApply(){
 }
 function refreshApplyBalance(){const e=employeeById($('applyEmployee').value);$('applyBalance').value=e?`${Math.max(0,balance(e))}日`:'--'}
 async function submitLeave(){
- const e=employeeById($('applyEmployee').value),date=$('leaveDate').value,type=Number($('leaveType').value);if(!e||!date){alert('入力を確認してください。');return}if(balance(e)<type){alert('利用可能残数が不足しています。');return}
- const row={employee_id:e.id,employee_name:e.name,dept:e.dept,leave_date:date,leave_type:type,reason:$('reason').value.trim(),status:'承認待ち',cancelled:false};
- try{
-  if(mode==='local'){state.requests.unshift({id:crypto.randomUUID(),employeeId:e.id,name:e.name,dept:e.dept,date,type,reason:row.reason,status:'承認待ち',createdAt:new Date().toISOString(),approvedAt:null,cancelled:false});localStorage.setItem(LOCALKEY,JSON.stringify(state))}
-  else await sbFetch('/rest/v1/leave_requests',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
-  $('reason').value='';await syncNow();alert('申請しました。');showView('statusView')
- }catch(e){alert('申請に失敗しました: '+cleanErr(e))}
+ const e=employeeById(applyEmployee.value),date=leaveDate.value,unit=leaveUnit.value,hours=unit==='hour'?Number(leaveHours.value||0):0,equiv=calcEquiv();
+ if(!e||!date||equiv<=0){alert('入力を確認してください。');return}if(balance(e)<equiv){alert('利用可能残数が不足しています。');return}
+ const row={employee_id:e.id,employee_name:e.name,dept:e.dept,leave_date:date,leave_type:equiv,leave_unit:unit,leave_hours:hours,equivalent_days:equiv,reason:reason.value.trim(),status:'承認待ち',cancelled:false,created_by:session.user.id};
+ try{await sbFetch('/rest/v1/leave_requests',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});reason.value='';await syncNow();alert('申請しました。');showView('statusView')}catch(e){alert('申請に失敗しました: '+cleanErr(e))}
 }
 function renderStatus(){
  const es=visibleEmployees(),old=$('statusEmployeeFilter').value;$('statusEmployeeFilter').innerHTML='<option value="">全件</option>'+es.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(old)$('statusEmployeeFilter').value=old;
  const f=$('statusEmployeeFilter').value,rows=visibleRequests().filter(r=>!r.cancelled&&(!f||r.employeeId===f));
- $('statusBody').innerHTML=rows.length?rows.map(r=>`<tr><td>${r.date}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${typeLabel(r.type)}</td><td>${badge(r.status)}</td><td>${esc(r.reason)}</td><td>${r.status==='承認待ち'?`<button class="ghost" onclick="cancelRequest('${r.id}')">取消</button>`:''} <button class="ghost" onclick="printRequest('${r.id}')">PDF</button></td></tr>`).join(''):'<tr><td colspan="7">申請はありません。</td></tr>'
+ $('statusBody').innerHTML=rows.length?rows.map(r=>`<tr><td>${r.date}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${leaveLabel(r)}</td><td>${badge(r.status)}</td><td>${esc(r.reason)}</td><td>${r.status==='承認待ち'?`<button class="ghost" onclick="cancelRequest('${r.id}')">取消</button>`:''} <button class="ghost" onclick="printRequest('${r.id}')">PDF</button></td></tr>`).join(''):'<tr><td colspan="8">申請はありません。</td></tr>'
 }
 async function cancelRequest(id){if(!confirm('この申請を取り消しますか？'))return;try{if(mode==='local'){const r=state.requests.find(x=>x.id===id);r.cancelled=true;localStorage.setItem(LOCALKEY,JSON.stringify(state))}else await sbFetch(`/rest/v1/leave_requests?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({cancelled:true})});await syncNow()}catch(e){alert(cleanErr(e))}}
 function moveMonth(n){calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()+n,1);renderCalendar()}
 function renderCalendar(){
  const y=calCursor.getFullYear(),m=calCursor.getMonth();$('calTitle').textContent=`${y}年 ${m+1}月`;const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());let html='';
- for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const leaves=state.requests.filter(r=>r.status==='承認'&&!r.cancelled&&r.date===ds);html+=`<div class="day ${d.getMonth()!==m?'other':''}"><div class="daynum">${d.getDate()}</div>${leaves.map(r=>`<span class="leave-chip">${esc(r.name)} ${typeLabel(r.type)}</span>`).join('')}</div>`}$('calendarGrid').innerHTML=html
+ for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const leaves=state.requests.filter(r=>r.status==='承認'&&!r.cancelled&&r.date===ds);html+=`<div class="day ${d.getMonth()!==m?'other':''}"><div class="daynum">${d.getDate()}</div>${leaves.map(r=>`<span class="leave-chip">${esc(r.name)} ${leaveLabel(r)}</span>`).join('')}</div>`}$('calendarGrid').innerHTML=html
 }
-function openEmployeeForm(id=''){if(!isAdmin())return;$('employeeForm').classList.remove('hidden');$('editEmployeeId').value=id;const e=employeeById(id);$('empName').value=e?.name||'';$('empDept').value=e?.dept||'';$('empEmail').value=e?.email||'';$('empHireDate').value=e?.hireDate||'';$('empCarry').value=e?.carryover??0;$('empGrant').value=e?.currentGrant??10;$('empNextGrant').value=e?.nextGrantDate||'';$('empNextGrantDays').value=e?.nextGrantDays??10}
+function openEmployeeForm(id=''){if(!isAdmin())return;$('employeeForm').classList.remove('hidden');$('editEmployeeId').value=id;const e=employeeById(id);$('empName').value=e?.name||'';$('empDept').value=e?.dept||'';$('empEmail').value=e?.email||'';$('empHireDate').value=e?.hireDate||'';$('empDailyHours').value=e?.dailyHours??8;$('empGrantYear').value=e?.grantYear??new Date().getFullYear();$('empCarry').value=e?.carryover??0;$('empGrant').value=e?.currentGrant??10;$('empNextGrant').value=e?.nextGrantDate||'';$('empNextGrantDays').value=e?.nextGrantDays??10}
 function closeEmployeeForm(){$('employeeForm').classList.add('hidden')}
 async function saveEmployee(){
- if(!isAdmin())return;const id=$('editEmployeeId').value,row={name:$('empName').value.trim(),dept:$('empDept').value.trim(),email:$('empEmail').value.trim().toLowerCase(),hire_date:$('empHireDate').value||null,carryover:Number($('empCarry').value||0),current_grant:Number($('empGrant').value||0),next_grant_date:$('empNextGrant').value||null,next_grant_days:Number($('empNextGrantDays').value||0)};if(!row.name){alert('氏名を入力してください。');return}
+ if(!isAdmin())return;const id=$('editEmployeeId').value,row={name:$('empName').value.trim(),dept:$('empDept').value.trim(),email:$('empEmail').value.trim().toLowerCase(),hire_date:$('empHireDate').value||null,daily_work_hours:Number($('empDailyHours').value||8),grant_year:Number($('empGrantYear').value||new Date().getFullYear()),carryover:Number($('empCarry').value||0),current_grant:Number($('empGrant').value||0),next_grant_date:$('empNextGrant').value||null,next_grant_days:Number($('empNextGrantDays').value||0)};if(!row.name){alert('氏名を入力してください。');return}
  try{
   if(mode==='local'){if(id){Object.assign(employeeById(id),{name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',carryover:row.carryover,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days})}else state.employees.push({id:crypto.randomUUID(),name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',carryover:row.carryover,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days});localStorage.setItem(LOCALKEY,JSON.stringify(state))}
   else if(id) await sbFetch(`/rest/v1/employees?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
@@ -266,23 +276,25 @@ async function saveEmployee(){
  }catch(e){alert('保存に失敗しました: '+cleanErr(e))}
 }
 function renderEmployees(){
- const es=visibleEmployees(),year=new Date().getFullYear();$('employeeBody').innerHTML=es.length?es.map(e=>{const used=usedDays(e.id),five=usedDays(e.id,year),remain=Math.max(0,balance(e)),pct=Math.min(100,(five/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td>${esc(e.email)}</td><td>${e.carryover}</td><td>${e.currentGrant}</td><td>${used}</td><td><b>${remain}</b></td><td>${five}/${state.fiveDayTarget}<div class="progress"><span style="width:${pct}%"></span></div></td><td>${e.nextGrantDate||''}</td><td>${isAdmin()?`<button class="ghost" onclick="openEmployeeForm('${e.id}')">編集</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="10">従業員情報がありません。</td></tr>'
+ const es=visibleEmployees(),year=new Date().getFullYear();$('employeeBody').innerHTML=es.length?es.map(e=>{const used=usedDays(e.id),five=usedDays(e.id,year),remain=Math.max(0,balance(e)),pct=Math.min(100,(five/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td>${e.hireDate||''}</td><td>${e.dailyHours}h</td><td>${e.carryover}</td><td>${e.currentGrant}</td><td>${used}</td><td><b>${remain}</b></td><td>${five}/${state.fiveDayTarget}<div class="progress"><span style="width:${pct}%"></span></div></td><td>${e.nextGrantDate||''}</td><td>${isAdmin()?`<button class="ghost" onclick="openEmployeeForm('${e.id}')">編集</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="10">従業員情報がありません。</td></tr>'
 }
 function renderAdmin(){
- const p=state.requests.filter(r=>r.status==='承認待ち'&&!r.cancelled);$('pendingList').innerHTML=isAdmin()?(p.length?p.map(r=>`<div class="card" style="margin:8px 0;background:#fbfcfe"><div><b>${r.date}</b>　${esc(r.name)}（${esc(r.dept)}）</div><div class="muted" style="margin:6px 0">${typeLabel(r.type)} ／ ${esc(r.reason||'理由なし')}</div><div class="actions"><button class="primary" onclick="decide('${r.id}','承認')">承認</button><button class="danger" onclick="decide('${r.id}','却下')">却下</button><button class="ghost" onclick="printRequest('${r.id}')">PDF</button></div></div>`).join(''):'承認待ちはありません。'):'';
+ const p=state.requests.filter(r=>r.status==='承認待ち'&&!r.cancelled);$('pendingList').innerHTML=isAdmin()?(p.length?p.map(r=>`<div class="card" style="margin:8px 0;background:#fbfcfe"><div><b>${r.date}</b>　${esc(r.name)}（${esc(r.dept)}）</div><div class="muted" style="margin:6px 0">${leaveLabel(r)} ／ ${esc(r.reason||'理由なし')}</div><div class="actions"><button class="primary" onclick="decide('${r.id}','承認')">承認</button><button class="danger" onclick="decide('${r.id}','却下')">却下</button><button class="ghost" onclick="printRequest('${r.id}')">PDF</button></div></div>`).join(''):'承認待ちはありません。'):'';
  renderAnnual()
 }
 async function decide(id,status){
- if(!isAdmin())return;const r=state.requests.find(x=>x.id===id),e=employeeById(r?.employeeId);if(!r)return;if(status==='承認'&&(!e||balance(e)<Number(r.type))){alert('残日数が不足しています。');return}
- try{if(mode==='local'){r.status=status;r.approvedAt=new Date().toISOString();localStorage.setItem(LOCALKEY,JSON.stringify(state))}else await sbFetch(`/rest/v1/leave_requests?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status,approved_at:new Date().toISOString(),approved_by:session.user.id})});await syncNow()}catch(e){alert(cleanErr(e))}
+ if(!isAdmin())return;const r=state.requests.find(x=>x.id===id),e=employeeById(r?.employeeId);if(!r)return;if(status==='承認'&&(!e||balance(e)<Number(r.equiv))){alert('残日数が不足しています。');return}
+ try{await sbFetch(`/rest/v1/leave_requests?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status,approved_at:new Date().toISOString(),approved_by:session.user.id})});
+ if(e?.email)await sbFetch('/rest/v1/notifications',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({recipient_email:e.email,title:`有給申請：${status}`,message:`${r.date} ${leaveLabel(r)} の申請が${status}になりました。`,leave_request_id:r.id})});
+ await syncNow()}catch(e){alert(cleanErr(e))}
 }
 function renderAnnual(){
- const y=new Date().getFullYear();$('annualYear').innerHTML=`<option value="${y}">${y}年</option>`;const rows=visibleRequests().filter(r=>!r.cancelled&&r.date.startsWith(y+'-')),approved=rows.filter(r=>r.status==='承認'),used=approved.reduce((a,r)=>a+Number(r.type||0),0);
+ const y=new Date().getFullYear();$('annualYear').innerHTML=`<option value="${y}">${y}年</option>`;const rows=visibleRequests().filter(r=>!r.cancelled&&r.date.startsWith(y+'-')),approved=rows.filter(r=>r.status==='承認'),used=approved.reduce((a,r)=>a+Number(r.equiv||0),0);
  $('annualSummary').innerHTML=`<div class="grid3"><div><div class="muted">申請件数</div><div class="stat">${rows.length}</div></div><div><div class="muted">承認済み取得</div><div class="stat">${used}</div><div class="muted">日</div></div><div><div class="muted">申請者数</div><div class="stat">${new Set(rows.map(r=>r.employeeId)).size}</div><div class="muted">人</div></div></div>`;
  $('fiveDayBody').innerHTML=visibleEmployees().map(e=>{const u=usedDays(e.id,y),rem=Math.max(0,state.fiveDayTarget-u),pct=Math.min(100,(u/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td>${esc(e.name)}</td><td>${esc(e.dept)}</td><td>${u}日</td><td>${rem===0?'達成':`あと ${rem}日`}</td><td><div class="progress"><span style="width:${pct}%"></span></div></td></tr>`}).join('')
 }
 function fmt(v){if(!v)return'';return new Date(v).toLocaleString('ja-JP')}
-function printRequest(id){const r=state.requests.find(x=>x.id===id),e=employeeById(r?.employeeId);if(!r)return;$('printArea').innerHTML=`<div class="card"><h2>有給休暇申請書</h2><table><tbody><tr><th>氏名</th><td>${esc(r.name)}</td><th>所属</th><td>${esc(r.dept)}</td></tr><tr><th>取得日</th><td>${r.date}</td><th>区分</th><td>${typeLabel(r.type)}</td></tr><tr><th>理由</th><td colspan="3">${esc(r.reason)}</td></tr><tr><th>状態</th><td>${esc(r.status)}</td><th>承認日時</th><td>${fmt(r.approvedAt)}</td></tr><tr><th>現在残数</th><td colspan="3">${e?Math.max(0,balance(e)):''}日</td></tr></tbody></table></div>`;window.print()}
+function printRequest(id){const r=state.requests.find(x=>x.id===id),e=employeeById(r?.employeeId);if(!r)return;$('printArea').innerHTML=`<div class="card"><h2>有給休暇申請書</h2><table><tbody><tr><th>氏名</th><td>${esc(r.name)}</td><th>所属</th><td>${esc(r.dept)}</td></tr><tr><th>取得日</th><td>${r.date}</td><th>区分</th><td>${leaveLabel(r)}</td></tr><tr><th>理由</th><td colspan="3">${esc(r.reason)}</td></tr><tr><th>状態</th><td>${esc(r.status)}</td><th>承認日時</th><td>${fmt(r.approvedAt)}</td></tr><tr><th>現在残数</th><td colspan="3">${e?Math.max(0,balance(e)):''}日</td></tr></tbody></table></div>`;window.print()}
 function printAnnual(){window.print()}
 async function importLegacyToCloud(){
  if(!isAdmin()||mode!=='cloud'){alert('クラウドの管理者としてログインしてください。');return}const raw=localStorage.getItem(LEGACY);if(!raw){alert('v3のローカルデータが見つかりません。');return}
@@ -292,7 +304,13 @@ async function importLegacyToCloud(){
   alert('従業員データを取り込みました。申請履歴の紐付けは重複防止のため手動確認が必要です。');await syncNow()
  }catch(e){alert('取り込みに失敗しました: '+cleanErr(e))}
 }
-function renderAll(){renderHome();renderApply();renderStatus();renderCalendar();renderEmployees();renderAdmin()}
+
+function myNotifications(){const m=(session?.user?.email||'').toLowerCase();return state.notifications.filter(n=>(n.recipient_email||'').toLowerCase()===m)}
+function renderNotifCount(){if($('notifCount'))$('notifCount').textContent=myNotifications().filter(n=>!n.is_read).length}
+function renderNotifications(){const rows=myNotifications();notificationsList.innerHTML=rows.length?rows.map(n=>`<div style="padding:10px 0;border-bottom:1px solid #ddd"><b>${esc(n.title)}</b><div>${esc(n.message)}</div><div class="muted">${new Date(n.created_at).toLocaleString('ja-JP')}</div></div>`).join(''):'通知はありません。';renderNotifCount()}
+async function markAllRead(){for(const n of myNotifications().filter(x=>!x.is_read))await sbFetch(`/rest/v1/notifications?id=eq.${n.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({is_read:true})});await syncNow();renderNotifications()}
+async function runAnnualCarryover(){if(!isAdmin())return;const y=new Date().getFullYear();if(!confirm(`${y}年度への繰越処理を実行しますか？`))return;for(const e of state.employees){if(e.grantYear>=y)continue;await sbFetch(`/rest/v1/employees?id=eq.${e.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({carryover:Math.max(0,balance(e)),current_grant:Number(e.nextGrantDays||e.currentGrant||0),grant_year:y})})}await syncNow();alert('年度繰越を実行しました。')}
+function renderAll(){renderHome();renderApply();renderStatus();renderCalendar();renderEmployees();renderAdmin();renderNotifCount()}
 
 (async function init(){
  updateCloudStatus();
