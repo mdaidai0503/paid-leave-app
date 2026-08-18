@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2f5b">
 <link rel="manifest" href="manifest.webmanifest">
-<title>有給休暇管理 v5.1</title>
+<title>有給休暇管理 v5.3</title>
 <style>
 :root{--navy:#0b2f5b;--bg:#f5f7fb;--line:#d9e0ea;--ok:#e9f7ef;--warn:#fff7df;--bad:#fdecec;--text:#172033}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -28,7 +28,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 </style>
 </head>
 <body>
-<header>有給休暇管理 v5.1</header>
+<header>有給休暇管理 v5.3</header>
 <main>
 
 <div id="authBar" class="authbar hidden no-print">
@@ -135,7 +135,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <h3 style="margin-top:0">クラウド接続設定</h3>
   <div class="grid"><div><label>Supabase Project URL</label><input id="sbUrl" placeholder="https://xxxxx.supabase.co"></div><div><label>Supabase anon key</label><textarea id="sbKey" style="min-height:100px"></textarea></div></div>
   <div class="actions" style="margin-top:11px"><button class="primary" onclick="saveCloudConfig()">保存</button><button class="ghost" onclick="testCloud()">接続テスト</button><button class="ghost" onclick="showView('loginView')">ログインへ戻る</button></div>
-  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
+  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.3では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
  </div>
  <div class="card">
   <h3 style="margin-top:0">ローカルデータ移行</h3>
@@ -162,6 +162,27 @@ const LOCALKEY='paidLeaveLocal';
 const LEGACY='paidLeaveAppV3';
 const SESSIONKEY='paidLeaveSession';
 
+function normalizeConfigObject(obj){
+  if(!obj || typeof obj!=='object') return {};
+  const url =
+    obj.url ||
+    obj.projectUrl ||
+    obj.project_url ||
+    obj.supabaseUrl ||
+    obj.supabase_url ||
+    '';
+  const key =
+    obj.key ||
+    obj.anonKey ||
+    obj.anon_key ||
+    obj.publishableKey ||
+    obj.publishable_key ||
+    obj.supabaseKey ||
+    obj.supabase_key ||
+    '';
+  return {url:String(url||'').trim(),key:String(key||'').trim()};
+}
+
 function migratePersistentSettings(){
   const configCandidates=[
     'paidLeaveCloudConfig',
@@ -169,62 +190,42 @@ function migratePersistentSettings(){
     'paidLeaveCloudConfigV5',
     'paidLeaveCloudConfigV4'
   ];
-  const localCandidates=[
-    'paidLeaveLocal',
-    'paidLeaveLocalV6',
-    'paidLeaveLocalV5',
-    'paidLeaveLocalV4'
-  ];
+  let best={};
+  for(const k of configCandidates){
+    const raw=localStorage.getItem(k);
+    if(!raw) continue;
+    try{
+      const n=normalizeConfigObject(JSON.parse(raw));
+      if(n.url && n.key){ best=n; break; }
+    }catch(e){}
+  }
+  if(best.url && best.key){
+    localStorage.setItem(CFGKEY,JSON.stringify(best));
+  }
+
   const sessionCandidates=[
     'paidLeaveSession',
     'paidLeaveSessionV6',
     'paidLeaveSessionV5',
     'paidLeaveSessionV4'
   ];
-
-  if(!localStorage.getItem(CFGKEY)){
-    for(const k of configCandidates){
-      const v=localStorage.getItem(k);
-      if(v){
-        try{
-          const p=JSON.parse(v);
-          if(p && p.url && p.key){
-            localStorage.setItem(CFGKEY,JSON.stringify(p));
-            break;
-          }
-        }catch(e){}
-      }
-    }
-  }
-
-  if(!localStorage.getItem(LOCALKEY)){
-    for(const k of localCandidates){
-      const v=localStorage.getItem(k);
-      if(v){
-        localStorage.setItem(LOCALKEY,v);
-        break;
-      }
-    }
-  }
-
   if(!localStorage.getItem(SESSIONKEY)){
     for(const k of sessionCandidates){
-      const v=localStorage.getItem(k);
-      if(v){
-        try{
-          const p=JSON.parse(v);
-          if(p && p.access_token){
-            localStorage.setItem(SESSIONKEY,JSON.stringify(p));
-            break;
-          }
-        }catch(e){}
-      }
+      const raw=localStorage.getItem(k);
+      if(!raw) continue;
+      try{
+        const p=JSON.parse(raw);
+        if(p && p.access_token){
+          localStorage.setItem(SESSIONKEY,JSON.stringify(p));
+          break;
+        }
+      }catch(e){}
     }
   }
 }
 migratePersistentSettings();
 
-let cfg=JSON.parse(localStorage.getItem(CFGKEY)||'{}');
+let cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||'{}'));
 let session=null, profile=null, mode='cloud';
 let state={employees:[],requests:[],notifications:[],fiveDayTarget:5};
 let calCursor=new Date();
@@ -238,17 +239,56 @@ function isAdmin(){return mode==='local'||profile?.role==='admin'}
 function currentEmail(){return session?.user?.email||profile?.email||''}
 
 function apiHeaders(extra={}){return {'apikey':cfg.key,'Authorization':`Bearer ${session?.access_token||cfg.key}`,'Content-Type':'application/json',...extra}}
-async function sbFetch(path,opt={}){if(!cfg.url||!cfg.key)throw new Error('Supabase接続設定がありません');const r=await fetch(cfg.url.replace(/\/$/,'')+path,{...opt,headers:{...apiHeaders(),...(opt.headers||{})}});const text=await r.text();if(!r.ok)throw new Error(text||`HTTP ${r.status}`);return text?JSON.parse(text):null}
+async function sbFetch(path,opt={}){
+  cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||JSON.stringify(cfg||{})));
+  if(!cfg.url || !cfg.key) throw new Error('Supabase接続設定がありません');
+  const base=cfg.url.replace(/\/+$/,'');
+  const r=await fetch(base+path,{...opt,headers:{...apiHeaders(),...(opt.headers||{})}});
+  const text=await r.text();
+  if(!r.ok) throw new Error(text||`HTTP ${r.status}`);
+  return text?JSON.parse(text):null
+}
 
 function saveCloudConfig(){
-  cfg={url:$('sbUrl').value.trim(),key:$('sbKey').value.trim()};
+  const url=String($('sbUrl').value||'').trim();
+  const key=String($('sbKey').value||'').trim();
+  if(!url || !key){
+    alert('Project URLとPublishable keyの両方を入力してください。');
+    return;
+  }
+  cfg={url,key};
   localStorage.setItem(CFGKEY,JSON.stringify(cfg));
   localStorage.setItem('paidLeaveCloudConfigV5',JSON.stringify(cfg));
   alert('保存しました。今後のバージョンにも自動で引き継がれます。');
   updateCloudStatus();
 }
-async function testCloud(){try{await fetch(cfg.url.replace(/\/$/,'')+'/rest/v1/',{headers:{apikey:cfg.key}});alert('接続先に到達しました。')}catch(e){alert('接続できませんでした: '+e.message)}}
-function updateCloudStatus(){$('sbUrl').value=cfg.url||'';$('sbKey').value=cfg.key||'';$('cloudStatus').textContent=cfg.url&&cfg.key?'Supabase接続設定済みです。':'Supabase未設定です。接続設定を行うか、ローカルモードで試してください。'}
+async function testCloud(){
+  const url=String($('sbUrl').value||cfg.url||'').trim().replace(/\/+$/,'');
+  const key=String($('sbKey').value||cfg.key||'').trim();
+  if(!url || !key){
+    alert('Project URLとPublishable keyを入力してから接続テストしてください。');
+    return;
+  }
+  try{
+    const r=await fetch(url+'/rest/v1/',{headers:{apikey:key}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    cfg={url,key};
+    localStorage.setItem(CFGKEY,JSON.stringify(cfg));
+    localStorage.setItem('paidLeaveCloudConfigV5',JSON.stringify(cfg));
+    alert('接続先に到達しました。設定も保存しました。');
+    updateCloudStatus();
+  }catch(e){
+    alert('接続できませんでした: '+(e?.message||e));
+  }
+}});alert('接続先に到達しました。')}catch(e){alert('接続できませんでした: '+e.message)}}
+function updateCloudStatus(){
+  cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||'{}'));
+  $('sbUrl').value=cfg.url||'';
+  $('sbKey').value=cfg.key||'';
+  $('cloudStatus').textContent=(cfg.url&&cfg.key)
+    ? 'Supabase接続設定済みです。'
+    : 'Supabase未設定です。接続設定を行ってください。';
+}
 
 async function login(){
  try{
