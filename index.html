@@ -16,8 +16,17 @@ label{display:block;font-size:13px;font-weight:700;margin-bottom:6px} input,sele
 button{border:0;border-radius:10px;padding:11px 14px;font:inherit;font-weight:700;cursor:pointer}.primary{background:var(--navy);color:#fff}.secondary{background:#eaf0f8;color:var(--navy)}.danger{background:#a72727;color:#fff}.ghost{background:#fff;border:1px solid var(--line)}
 .actions{display:flex;gap:8px;flex-wrap:wrap}.stat{font-size:28px;font-weight:800}.muted{color:#64748b;font-size:13px}.hidden{display:none!important}
 .table-wrap{overflow:auto} table{width:100%;border-collapse:collapse;min-width:720px} th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;font-size:14px} th{background:#f7f9fc;position:sticky;top:0}.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}.pending{background:var(--warn)}.approved{background:var(--ok)}.rejected{background:var(--bad)}
-nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;grid-template-columns:repeat(4,1fr);gap:1px;padding-bottom:env(safe-area-inset-bottom);z-index:10} nav button{border-radius:0;background:var(--navy);color:#fff;padding:10px 4px 8px;font-size:12px}.navicon{display:block;font-size:20px;margin-bottom:2px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;grid-template-columns:repeat(5,1fr);gap:1px;padding-bottom:env(safe-area-inset-bottom);z-index:10} nav button{border-radius:0;background:var(--navy);color:#fff;padding:10px 4px 8px;font-size:12px}.navicon{display:block;font-size:20px;margin-bottom:2px}
 @media(max-width:640px){.grid,.grid3{grid-template-columns:1fr}.card{padding:13px}main{padding:12px 12px 86px}}
+.year-row{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.year-row>div{min-width:150px}
+.notice{padding:10px 12px;border-radius:10px;background:#eef5ff;margin:8px 0;font-size:14px}
+@media print{
+  header,nav,#homeView,#applyView,#statusView,#adminView,.no-print{display:none!important}
+  #printArea{display:block!important} body{background:#fff;color:#000}
+  main{max-width:none;padding:0} .card{border:0;box-shadow:none;padding:0}
+  table{min-width:0} th,td{font-size:11px;padding:6px;border:1px solid #bbb}
+  @page{size:A4 portrait;margin:10mm}
+}
 </style>
 </head>
 <body>
@@ -70,15 +79,33 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
         <div><label>年間付与日数</label><input id="grantDays" type="number" min="0" step="0.5"></div>
         <div><label>管理者PIN</label><input id="newAdminPin" inputmode="numeric"></div>
       </div>
-      <div class="actions" style="margin-top:12px"><button class="secondary" onclick="saveSettings()">設定を保存</button><button class="ghost" onclick="exportBackup()">バックアップ書き出し</button><label class="ghost" style="display:inline-flex;align-items:center;padding:11px 14px;border-radius:10px;cursor:pointer">復元<input id="restoreFile" type="file" accept="application/json" style="display:none" onchange="restoreBackup(event)"></label></div>
+      <div class="actions" style="margin-top:12px"><button class="secondary" onclick="saveSettings()">設定を保存</button><button class="ghost" onclick="enableNotifications()">🔔 通知を有効にする</button><button class="ghost" onclick="exportBackup()">バックアップ書き出し</button><label class="ghost" style="display:inline-flex;align-items:center;padding:11px 14px;border-radius:10px;cursor:pointer">復元<input id="restoreFile" type="file" accept="application/json" style="display:none" onchange="restoreBackup(event)"></label></div>
     </div>
   </div>
 </section>
+
+<section id="annualView" class="hidden">
+  <div class="card">
+    <h3 style="margin-top:0">年間管理</h3>
+    <div class="year-row no-print">
+      <div><label>対象年</label><select id="annualYear" onchange="renderAnnual()"></select></div>
+      <button class="secondary" onclick="printAnnual()">年間一覧をPDF保存／印刷</button>
+    </div>
+    <div id="annualSummary" style="margin-top:14px"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>取得日</th><th>氏名</th><th>所属</th><th>区分</th><th>状態</th><th>理由</th><th>申請日時</th><th>承認日時</th></tr></thead>
+      <tbody id="annualBody"></tbody>
+    </table></div>
+  </div>
+</section>
+<section id="printArea" class="hidden"></section>
+
 </main>
 <nav>
 <button onclick="showView('homeView')"><span class="navicon">🏠</span>ホーム</button>
 <button onclick="showView('applyView')"><span class="navicon">📝</span>申請</button>
 <button onclick="showView('statusView')"><span class="navicon">📋</span>状況</button>
+<button onclick="showView('annualView')"><span class="navicon">📅</span>年間</button>
 <button onclick="showView('adminView')"><span class="navicon">✅</span>承認</button>
 </nav>
 <script>
@@ -86,21 +113,65 @@ const KEY='paidLeaveAppV1';
 let state=loadState();
 function loadState(){try{return JSON.parse(localStorage.getItem(KEY))||{grantDays:20,adminPin:'1234',requests:[]}}catch{return{grantDays:20,adminPin:'1234',requests:[]}}}
 function saveState(){localStorage.setItem(KEY,JSON.stringify(state));renderAll()}
-function showView(id){['homeView','applyView','statusView','adminView'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id)); if(id==='statusView')renderStatus(); if(id==='adminView')renderAdmin();}
+function showView(id){['homeView','applyView','statusView','annualView','adminView'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id)); if(id==='statusView')renderStatus(); if(id==='annualView')renderAnnual(); if(id==='adminView')renderAdmin();}
 function typeLabel(v){return Number(v)===0.5?'半日':'1日'}
 function statusBadge(s){const c=s==='承認'?'approved':s==='却下'?'rejected':'pending';return `<span class="badge ${c}">${s}</span>`}
-function submitLeave(){const name=employeeName.value.trim(), dept=department.value.trim(), date=leaveDate.value, type=Number(leaveType.value), why=reason.value.trim(); if(!name||!date){alert('氏名と取得日を入力してください。');return} state.requests.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,dept,date,type,reason:why,status:'承認待ち',createdAt:new Date().toISOString(),approvedAt:null}); saveState(); reason.value=''; alert('申請しました。'); showView('statusView')}
+function submitLeave(){const name=employeeName.value.trim(), dept=department.value.trim(), date=leaveDate.value, type=Number(leaveType.value), why=reason.value.trim(); if(!name||!date){alert('氏名と取得日を入力してください。');return} state.requests.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,dept,date,type,reason:why,status:'承認待ち',createdAt:new Date().toISOString(),approvedAt:null}); saveState(); reason.value=''; notifyUser('有給休暇を申請しました',`${date} ${typeLabel(type)}の申請を登録しました。`); alert('申請しました。'); showView('statusView')}
 function approvedUsed(){return state.requests.filter(r=>r.status==='承認').reduce((a,r)=>a+Number(r.type||0),0)}
 function renderHome(){const used=approvedUsed(); grantStat.textContent=state.grantDays; usedStat.textContent=used; remainStat.textContent=Math.max(0,state.grantDays-used); const recent=state.requests.slice(0,5); recentList.innerHTML=recent.length?recent.map(r=>`<div style="padding:9px 0;border-bottom:1px solid #edf1f6"><b>${r.date}</b>　${r.name}　${typeLabel(r.type)}　${statusBadge(r.status)}</div>`).join(''):'申請はまだありません。'}
 function renderStatus(){statusBody.innerHTML=state.requests.length?state.requests.map(r=>`<tr><td>${r.date}</td><td>${esc(r.name)}</td><td>${typeLabel(r.type)}</td><td>${statusBadge(r.status)}</td><td>${esc(r.reason||'')}</td></tr>`).join(''):`<tr><td colspan="5" class="muted">申請はまだありません。</td></tr>`}
 function unlockAdmin(){if(adminPin.value===state.adminPin){adminPanel.classList.remove('hidden');renderAdmin()}else alert('PINが違います。')}
-function renderAdmin(){grantDays.value=state.grantDays;newAdminPin.value=state.adminPin;const p=state.requests.filter(r=>r.status==='承認待ち');pendingList.innerHTML=p.length?p.map(r=>`<div class="card" style="margin:8px 0;background:#fbfcfe"><div><b>${r.date}</b>　${esc(r.name)}（${esc(r.dept||'所属なし')}）</div><div class="muted" style="margin:6px 0">${typeLabel(r.type)} ／ ${esc(r.reason||'理由なし')}</div><div class="actions"><button class="primary" onclick="decide('${r.id}','承認')">承認</button><button class="danger" onclick="decide('${r.id}','却下')">却下</button></div></div>`).join(''):'<div class="muted">承認待ちはありません。</div>'}
-function decide(id,status){const r=state.requests.find(x=>x.id===id);if(!r)return; if(status==='承認'){const remain=state.grantDays-approvedUsed(); if(remain<Number(r.type)){alert('残日数が不足しています。');return}} r.status=status;r.approvedAt=new Date().toISOString();saveState()}
+function renderAdmin(){grantDays.value=state.grantDays;newAdminPin.value=state.adminPin;const p=state.requests.filter(r=>r.status==='承認待ち');pendingList.innerHTML=p.length?p.map(r=>`<div class="card" style="margin:8px 0;background:#fbfcfe"><div><b>${r.date}</b>　${esc(r.name)}（${esc(r.dept||'所属なし')}）</div><div class="muted" style="margin:6px 0">${typeLabel(r.type)} ／ ${esc(r.reason||'理由なし')}</div><div class="actions"><button class="primary" onclick="decide('${r.id}','承認')">承認</button><button class="danger" onclick="decide('${r.id}','却下')">却下</button><button class="ghost" onclick="printRequest('${r.id}')">PDF</button></div></div>`).join(''):'<div class="muted">承認待ちはありません。</div>'}
+function decide(id,status){const r=state.requests.find(x=>x.id===id);if(!r)return; if(status==='承認'){const remain=state.grantDays-approvedUsed(); if(remain<Number(r.type)){alert('残日数が不足しています。');return}} r.status=status;r.approvedAt=new Date().toISOString();saveState();notifyUser(`有給申請：${status}`,`${r.date} ${r.name} の申請が${status}になりました。`)}
 function saveSettings(){const gd=Number(grantDays.value), pin=newAdminPin.value.trim(); if(!Number.isFinite(gd)||gd<0||!pin){alert('設定値を確認してください。');return} state.grantDays=gd;state.adminPin=pin;saveState();alert('保存しました。')}
 function exportBackup(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paid-leave-backup-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click();URL.revokeObjectURL(a.href)}
 function restoreBackup(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d.requests)throw 0;state=d;saveState();alert('復元しました。')}catch{alert('バックアップファイルを読み込めませんでした。')}};rd.readAsText(f)}
+
+
+function printRequest(id){
+  const r=state.requests.find(x=>x.id===id);if(!r)return;
+  printArea.innerHTML=`<div class="card"><h2>有給休暇申請書</h2><table><tbody>
+  <tr><th>氏名</th><td>${esc(r.name)}</td><th>所属</th><td>${esc(r.dept||'')}</td></tr>
+  <tr><th>取得日</th><td>${r.date}</td><th>区分</th><td>${typeLabel(r.type)}</td></tr>
+  <tr><th>理由</th><td colspan="3">${esc(r.reason||'')}</td></tr>
+  <tr><th>状態</th><td>${r.status}</td><th>承認日時</th><td>${fmtDateTime(r.approvedAt)}</td></tr>
+  </tbody></table></div>`;
+  window.print();
+}
+function notifyUser(title,body){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='granted'){try{new Notification(title,{body})}catch{}}
+}
+async function enableNotifications(){
+  if(!('Notification' in window)){alert('この端末・ブラウザでは通知機能を利用できません。');return}
+  const p=await Notification.requestPermission();
+  alert(p==='granted'?'通知を有効にしました。':'通知は許可されませんでした。');
+}
+function initYears(){
+  const y=new Date().getFullYear(), years=new Set([y]);
+  state.requests.forEach(r=>{if(r.date) years.add(Number(r.date.slice(0,4)))});
+  annualYear.innerHTML=[...years].sort((a,b)=>b-a).map(v=>`<option value="${v}">${v}年</option>`).join('');
+}
+function renderAnnual(){
+  if(!annualYear.options.length)initYears();
+  const y=Number(annualYear.value||new Date().getFullYear());
+  const rows=state.requests.filter(r=>r.date&&Number(r.date.slice(0,4))===y).sort((a,b)=>a.date.localeCompare(b.date));
+  const approved=rows.filter(r=>r.status==='承認');
+  const used=approved.reduce((a,r)=>a+Number(r.type||0),0);
+  const people=[...new Set(rows.map(r=>r.name))];
+  annualSummary.innerHTML=`<div class="grid3"><div><div class="muted">申請件数</div><div class="stat">${rows.length}</div></div><div><div class="muted">承認済み取得</div><div class="stat">${used}</div><div class="muted">日</div></div><div><div class="muted">申請者数</div><div class="stat">${people.length}</div><div class="muted">人</div></div></div>`;
+  annualBody.innerHTML=rows.length?rows.map(r=>`<tr><td>${r.date}</td><td>${esc(r.name)}</td><td>${esc(r.dept||'')}</td><td>${typeLabel(r.type)}</td><td>${r.status}</td><td>${esc(r.reason||'')}</td><td>${fmtDateTime(r.createdAt)}</td><td>${fmtDateTime(r.approvedAt)}</td></tr>`).join(''):`<tr><td colspan="8" class="muted">この年の申請はありません。</td></tr>`;
+}
+function fmtDateTime(v){if(!v)return'';try{return new Date(v).toLocaleString('ja-JP')}catch{return''}}
+function printAnnual(){
+  renderAnnual();
+  const y=annualYear.value;
+  printArea.innerHTML=`<div class="card"><h2>${y}年 有給休暇年間管理表</h2>${annualSummary.innerHTML}<table><thead><tr><th>取得日</th><th>氏名</th><th>所属</th><th>区分</th><th>状態</th><th>理由</th><th>申請日時</th><th>承認日時</th></tr></thead><tbody>${annualBody.innerHTML}</tbody></table></div>`;
+  window.print();
+}
+
 function esc(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function renderAll(){renderHome();renderStatus();renderAdmin()}
+function renderAll(){renderHome();renderStatus();initYears();renderAnnual();renderAdmin()}
 renderAll();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 </script>
