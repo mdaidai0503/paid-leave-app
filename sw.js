@@ -3,7 +3,7 @@
    同一オリジンのGETのみを扱い、null Responseを返さない安全版です。
 */
 
-const CACHE_NAME = 'paid-leave-v5.4-publishable-fix-20260819';
+const CACHE_NAME = 'paid-leave-v5.4-apply-fix-20260819';
 
 // GitHub Pages上で同じ階層にある基本ファイルだけを対象にします。
 // 存在しないファイルがあってもService Workerのインストール自体は失敗させません。

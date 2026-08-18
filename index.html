@@ -378,16 +378,108 @@ function renderHome(){
  $('todayList').innerHTML=todays.length?todays.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #edf1f6"><b>${esc(r.name)}</b>　${esc(r.dept)}　${leaveLabel(r)}</div>`).join(''):'該当者はいません。';
  const recent=vr.filter(r=>!r.cancelled).slice(0,6);$('recentList').innerHTML=recent.length?recent.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #edf1f6"><b>${r.date}</b>　${esc(r.name)}　${leaveLabel(r)}　${badge(r.status)}</div>`).join(''):'申請はありません。'
 }
+
+function calcEquiv(){
+  const unit=$('leaveUnit')?.value||'day';
+  if(unit==='half') return 0.5;
+  if(unit==='hour'){
+    const e=employeeById($('applyEmployee')?.value);
+    const daily=Math.max(0.5,Number(e?.dailyHours||8));
+    const hours=Math.max(0,Number($('leaveHours')?.value||0));
+    return hours/daily;
+  }
+  return 1;
+}
+function updatePreview(){
+  const equiv=calcEquiv();
+  const p=$('equivPreview');
+  if(!p)return;
+  if(($('leaveUnit')?.value||'day')==='hour'){
+    p.textContent=`日数換算：${Math.round(equiv*100)/100}日`;
+  }else{
+    p.textContent=`日数換算：${equiv}日`;
+  }
+}
+function toggleHourInput(){
+  const isHour=$('leaveUnit')?.value==='hour';
+  $('hourWrap')?.classList.toggle('hidden',!isHour);
+  updatePreview();
+}
+
 function renderApply(){
  const es=visibleEmployees();$('applyEmployee').innerHTML=es.length?es.map(e=>`<option value="${e.id}">${esc(e.name)}（${esc(e.dept||'')}）</option>`).join(''):'<option value="">従業員登録が必要です</option>';
- $('leaveDate').value=$('leaveDate').value||isoToday();refreshApplyBalance()
+ $('leaveDate').value=$('leaveDate').value||isoToday();refreshApplyBalance();toggleHourInput()
 }
 function refreshApplyBalance(){const e=employeeById($('applyEmployee').value);$('applyBalance').value=e?`${Math.max(0,balance(e))}日`:'--'}
 async function submitLeave(){
- const e=employeeById(applyEmployee.value),date=leaveDate.value,unit=leaveUnit.value,hours=unit==='hour'?Number(leaveHours.value||0):0,equiv=calcEquiv();
- if(!e||!date||equiv<=0){alert('入力を確認してください。');return}if(balance(e)<equiv){alert('利用可能残数が不足しています。');return}
- const row={employee_id:e.id,employee_name:e.name,dept:e.dept,leave_date:date,leave_type:equiv,leave_unit:unit,leave_hours:hours,equivalent_days:equiv,reason:reason.value.trim(),status:'承認待ち',cancelled:false,created_by:session.user.id};
- try{await sbFetch('/rest/v1/leave_requests',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});reason.value='';await syncNow();alert('申請しました。');showView('statusView')}catch(e){alert('申請に失敗しました: '+cleanErr(e))}
+  const btn=document.querySelector('button[onclick="submitLeave()"]');
+  if(btn?.disabled)return;
+  try{
+    if(btn){btn.disabled=true;btn.textContent='送信中…'}
+    const employeeId=$('applyEmployee')?.value||'';
+    const e=employeeById(employeeId);
+    const date=$('leaveDate')?.value||'';
+    const unit=$('leaveUnit')?.value||'day';
+    const hours=unit==='hour'?Number($('leaveHours')?.value||0):0;
+    const equiv=calcEquiv();
+    if(!e||!date||!Number.isFinite(equiv)||equiv<=0){
+      throw new Error('入力を確認してください。');
+    }
+    if(balance(e)<equiv){
+      throw new Error('利用可能残数が不足しています。');
+    }
+    const reasonText=String($('reason')?.value||'').trim();
+
+    if(mode==='local'){
+      state.requests.unshift({
+        id:'local-'+Date.now(),
+        employeeId:e.id,
+        name:e.name,
+        dept:e.dept,
+        date,
+        unit,
+        hours,
+        equiv,
+        reason:reasonText,
+        status:'承認待ち',
+        createdAt:new Date().toISOString(),
+        approvedAt:null,
+        cancelled:false
+      });
+      localStorage.setItem(LOCALKEY,JSON.stringify(state));
+      renderAll();
+    }else{
+      if(!session?.user?.id) throw new Error('ログイン情報がありません。いったんログインし直してください。');
+      const row={
+        employee_id:e.id,
+        employee_name:e.name,
+        dept:e.dept,
+        leave_date:date,
+        leave_type:equiv,
+        leave_unit:unit,
+        leave_hours:hours,
+        equivalent_days:equiv,
+        reason:reasonText,
+        status:'承認待ち',
+        cancelled:false,
+        created_by:session.user.id
+      };
+      await sbFetch('/rest/v1/leave_requests',{
+        method:'POST',
+        headers:{Prefer:'return=minimal'},
+        body:JSON.stringify(row)
+      });
+      await syncNow();
+    }
+
+    if($('reason'))$('reason').value='';
+    alert('申請しました。');
+    showView('statusView');
+  }catch(err){
+    alert('申請に失敗しました: '+cleanErr(err));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='申請する'}
+  }
 }
 function renderStatus(){
  const es=visibleEmployees(),old=$('statusEmployeeFilter').value;$('statusEmployeeFilter').innerHTML='<option value="">全件</option>'+es.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(old)$('statusEmployeeFilter').value=old;
