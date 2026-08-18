@@ -280,7 +280,7 @@ async function testCloud(){
   }catch(e){
     alert('接続できませんでした: '+(e?.message||e));
   }
-
+}});alert('接続先に到達しました。')}catch(e){alert('接続できませんでした: '+e.message)}}
 function updateCloudStatus(){
   cfg=normalizeConfigObject(JSON.parse(localStorage.getItem(CFGKEY)||'{}'));
   $('sbUrl').value=cfg.url||'';
