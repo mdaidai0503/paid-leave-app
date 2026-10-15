@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2f5b">
 <link rel="manifest" href="manifest.webmanifest">
-<title>有給休暇管理 v5.5</title>
+<title>有給休暇管理 v5.6</title>
 <style>
 :root{--navy:#0b2f5b;--bg:#f5f7fb;--line:#d9e0ea;--ok:#e9f7ef;--warn:#fff7df;--bad:#fdecec;--text:#172033}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -28,7 +28,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 </style>
 </head>
 <body>
-<header>有給休暇管理 v5.5</header>
+<header>有給休暇管理 v5.6</header>
 <main>
 
 <div id="authBar" class="authbar hidden no-print">
@@ -41,8 +41,8 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <h3 style="margin-top:0">ログイン</h3>
   <div id="cloudStatus" class="notice">接続設定を確認しています…</div>
   <div class="grid">
-   <div><label>メールアドレス</label><input id="loginEmail" type="email" autocomplete="username"></div>
-   <div><label>パスワード</label><input id="loginPassword" type="password" autocomplete="current-password"></div>
+   <div><label for="loginEmail">メールアドレス</label><input id="loginEmail" type="email" autocomplete="username"></div>
+   <div><label for="loginPassword">パスワード</label><input id="loginPassword" type="password" autocomplete="current-password"></div>
   </div>
   <div class="actions" style="margin-top:12px"><button class="primary" onclick="login()">ログイン</button><button class="secondary" onclick="signup()">新規登録</button><button class="ghost" onclick="showView('settingsView')">接続設定</button></div>
   <div class="muted" style="margin-top:10px">Supabase未設定の場合はローカルモードでも試せます。</div>
@@ -60,7 +60,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
    <div><div class="muted">5日未達</div><div id="dashFive" class="stat">0</div><div class="muted">人</div></div>
   </div>
  </div>
- <div class="card"><h3 style="margin-top:0">本日の休暇</h3><div id="todayList" class="muted">該当者はいません。</div></div>
+ <div class="card admin-only"><h3 style="margin-top:0">初期設定・従業員情報</h3><p>従業員名・入社日・所定時間・有給残数・付与日・期限・次回付与をまとめて設定します。</p><div class="actions"><button class="primary" onclick="openEmployeeForm()">初期設定・従業員登録</button><button class="secondary" onclick="showView('employeesView')">登録済み情報の確認・編集</button></div></div><div class="card"><h3 style="margin-top:0">本日の休暇</h3><div id="todayList" class="muted">該当者はいません。</div></div>
  <div class="card"><h3 style="margin-top:0">最近の申請</h3><div id="recentList" class="muted">申請はありません。</div></div>
 </section>
 
@@ -68,22 +68,35 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
  <div class="card">
   <h3 style="margin-top:0">有給休暇を申請</h3>
   <div class="grid">
-   <div><label>従業員</label><select id="applyEmployee" onchange="refreshApplyBalance()"></select></div>
-   <div><label>取得日時点の利用可能残数</label><input id="applyBalance" readonly></div>
-   <div><label>取得日</label><input id="leaveDate" type="date" onchange="refreshApplyBalance()"></div>
-   <div><label>区分</label><select id="leaveUnit" onchange="toggleHourInput()"><option value="day">1日</option><option value="half">半日</option><option value="hour">時間単位</option></select></div>
-<div id="hourWrap" class="hidden"><label>取得時間</label><input id="leaveHours" type="number" min="0.5" step="0.5" value="1" oninput="updatePreview()"></div>
+   <div><label for="applyEmployee">従業員</label><select id="applyEmployee" onchange="refreshApplyBalance()"></select></div>
+   <div><label for="applyBalance">取得日時点の利用可能残数</label><input id="applyBalance" readonly></div>
+   <div><label for="leaveDate">取得日</label><input id="leaveDate" type="date" onchange="refreshApplyBalance()"></div>
+   <div><label for="leaveUnit">区分</label><select id="leaveUnit" onchange="toggleHourInput()"><option value="day">1日</option><option value="half">半日</option><option value="hour">時間単位</option></select></div>
+<div id="hourWrap" class="hidden"><label for="leaveHours">取得時間</label><input id="leaveHours" type="number" min="0.5" step="0.5" value="1" oninput="updatePreview()"></div>
   </div>
   <div id="equivPreview" class="notice">日数換算：1日</div>
-<div style="margin-top:11px"><label>理由（任意）</label><textarea id="reason" placeholder="例：私用のため"></textarea></div>
+<div style="margin-top:11px"><label for="reason">理由（任意）</label><textarea id="reason" placeholder="例：私用のため"></textarea></div>
   <div class="actions" style="margin-top:11px"><button class="primary" onclick="submitLeave()">申請する</button></div>
  </div>
 </section>
 
 <section id="statusView" class="hidden">
+ <div id="requestEditor" class="card hidden">
+  <h3>申請内容の修正</h3><input type="hidden" id="editRequestId">
+  <div class="grid3">
+   <div><label for="editRequestEmployee">従業員</label><select id="editRequestEmployee" onchange="updateRequestPreview()"></select></div>
+   <div><label for="editRequestDate">取得日</label><input id="editRequestDate" type="date" onchange="updateRequestPreview()"></div>
+   <div><label for="editRequestUnit">区分</label><select id="editRequestUnit" onchange="updateRequestPreview()"><option value="day">1日</option><option value="half">半日</option><option value="hour">時間単位</option></select></div>
+   <div id="editRequestHoursWrap"><label for="editRequestHours">取得時間</label><input id="editRequestHours" type="number" min="0.5" step="0.5" oninput="updateRequestPreview()"></div>
+   <div class="admin-only"><label for="editRequestStatus">申請状態</label><select id="editRequestStatus"><option>承認待ち</option><option>承認</option><option>却下</option></select></div>
+  </div>
+  <div id="editRequestPreview" class="notice"></div>
+  <label for="editRequestReason">理由（任意）</label><textarea id="editRequestReason"></textarea>
+  <div class="actions" style="margin-top:10px"><button id="saveRequestButton" class="primary" onclick="saveRequestEdit()">修正を保存</button><button class="ghost" onclick="closeRequestEditor()">キャンセル</button></div>
+ </div>
  <div class="card">
   <div class="section-title"><h3 style="margin:0">申請状況</h3><select id="statusEmployeeFilter" onchange="renderStatus()" style="width:auto"></select></div>
-  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>取得日</th><th>氏名</th><th>所属</th><th>区分</th><th>日数換算</th><th>状態</th><th>理由</th><th>操作</th></tr></thead><tbody id="statusBody"></tbody></table></div>
+  <label style="margin-top:12px"><input type="checkbox" id="showDeletedRequests" onchange="renderStatus()" style="width:auto"> 削除済みも表示する</label><div class="muted">管理者は全申請、従業員は自分の承認待ち申請を修正・削除できます。</div><div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>取得日</th><th>氏名</th><th>所属</th><th>区分</th><th>日数換算</th><th>状態</th><th>理由</th><th>操作</th></tr></thead><tbody id="statusBody"></tbody></table></div>
  </div>
 </section>
 
@@ -97,18 +110,23 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 
 <section id="employeesView" class="hidden">
  <div class="card">
-  <div class="section-title"><h3 style="margin:0">従業員マスター</h3><button class="primary admin-only" onclick="openEmployeeForm()">＋ 従業員追加</button></div>
+  <div class="section-title"><h3 style="margin:0">従業員・有給の初期設定</h3><button class="primary admin-only" onclick="openEmployeeForm()">＋ 初期設定・従業員登録</button></div>
   <div id="employeeForm" class="hidden admin-only" style="margin-top:12px">
-   <input type="hidden" id="editEmployeeId">
+   <h3 id="employeeFormTitle">従業員・有給の初期設定</h3><input type="hidden" id="editEmployeeId">
    <div class="grid3">
-    <div><label>氏名</label><input id="empName"></div><div><label>所属</label><input id="empDept"></div><div><label>メール</label><input id="empEmail" type="email"></div>
-    <div><label>入社日</label><input id="empHireDate" type="date"></div><div><label>1日の所定時間</label><input id="empDailyHours" type="number" min="1" step="0.5" value="8"></div>
+    <div><label for="empName">従業員名（必須）</label><input id="empName" required></div><div><label for="empDept">所属</label><input id="empDept"></div><div><label for="empEmail">メール</label><input id="empEmail" type="email"></div>
+    <div><label for="empHireDate">入社日（必須）</label><input id="empHireDate" type="date" required></div><div><label for="empDailyHours">1日の所定時間</label><input id="empDailyHours" type="number" min="1" step="0.5" value="8"></div>
 
-    <div><label>次回付与日</label><input id="empNextGrant" type="date"></div><div><label>次回付与日数</label><input id="empNextGrantDays" type="number" min="0" step="0.5" value="10"></div>
+    <div><label for="empNextGrant">次回付与日</label><input id="empNextGrant" type="date"></div><div><label for="empNextGrantDays">次回付与日数</label><input id="empNextGrantDays" type="number" min="0" step="0.5" value="10"></div>
    </div>
-   <div class="notice">新しく付与された有給から先に消化します。有効期限当日まで利用できます。付与日数は取得分を引く前の数です。旧データの前年繰越は、当年の付与日から利用する期首残数として扱います。旧データの日付は1月1日を仮設定するため、初回保存前に確認してください。</div>
+   <div class="grid" style="margin-top:12px">
+    <div><label for="empBalanceMode">有給の入力方法</label><select id="empBalanceMode" onchange="updateBalanceMode()"><option value="balance">基準日時点の残数を入力</option><option value="history">取得前の付与日数を入力</option></select></div>
+    <div id="empBalanceStartWrap"><label for="empBalanceStart">残数の基準日（この日の取得前）</label><input id="empBalanceStart" type="date" onchange="updateBalanceMode()"></div>
+   </div>
+   <div id="balanceModeHelp" class="notice"></div>
+   <div class="notice">新しく付与された有給から先に消化します。有効期限当日まで利用できます。入力方法に応じて付与日数または残数を入力してください。旧データの前年繰越は、当年の付与日から利用する期首残数として扱います。旧データの日付は1月1日を仮設定するため、初回保存前に確認してください。</div>
    <div id="grantEditor"></div><button class="secondary" onclick="addGrantRow()">＋ 付与履歴を追加</button>
-   <div class="actions" style="margin-top:10px"><button class="primary" onclick="saveEmployee()">保存</button><button class="ghost" onclick="closeEmployeeForm()">キャンセル</button></div>
+   <div class="actions" style="margin-top:10px"><button class="primary" id="saveEmployeeButton" onclick="saveEmployee()">保存</button><button class="ghost" onclick="closeEmployeeForm()">キャンセル</button></div>
   </div>
   <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>氏名</th><th>所属</th><th>入社日</th><th>所定時間</th><th colspan="2">付与別残数・有効期限</th><th>取得</th><th>残数</th><th>5日取得</th><th>次回付与</th><th>操作</th></tr></thead><tbody id="employeeBody"></tbody></table></div>
  </div>
@@ -135,9 +153,9 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 <section id="settingsView" class="hidden">
  <div class="card">
   <h3 style="margin-top:0">クラウド接続設定</h3>
-  <div class="grid"><div><label>Supabase Project URL</label><input id="sbUrl" placeholder="https://xxxxx.supabase.co"></div><div><label>Supabase anon key</label><textarea id="sbKey" style="min-height:100px"></textarea></div></div>
+  <div class="grid"><div><label for="sbUrl">Supabase Project URL</label><input id="sbUrl" placeholder="https://xxxxx.supabase.co"></div><div><label for="sbKey">Supabase anon key</label><textarea id="sbKey" style="min-height:100px"></textarea></div></div>
   <div class="actions" style="margin-top:11px"><button class="primary" onclick="saveCloudConfig()">保存</button><button class="ghost" onclick="testCloud()">接続テスト</button><button class="ghost" onclick="showView('loginView')">ログインへ戻る</button></div>
-  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.5では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
+  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.6では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
  </div>
  <div class="card">
   <h3 style="margin-top:0">ローカルデータ移行</h3>
@@ -354,7 +372,7 @@ async function syncNow(){
    sbFetch('/rest/v1/app_settings?id=eq.1&select=*'),
    sbFetch('/rest/v1/notifications?select=*&order=created_at.desc')
   ]);
-  state.employees=(emps||[]).map(e=>({id:e.id,name:e.name,dept:e.dept||'',email:e.email||'',hireDate:e.hire_date||'',dailyHours:Number(e.daily_work_hours||8),grantYear:Number(e.grant_year||new Date().getFullYear()),leaveGrants:e.leave_grants??null,carryover:Number(e.carryover||0),currentGrant:Number(e.current_grant||0),nextGrantDate:e.next_grant_date||'',nextGrantDays:Number(e.next_grant_days||0)}));
+  state.employees=(emps||[]).map(e=>({id:e.id,name:e.name,dept:e.dept||'',email:e.email||'',hireDate:e.hire_date||'',dailyHours:Number(e.daily_work_hours||8),grantYear:Number(e.grant_year||new Date().getFullYear()),leaveGrants:e.leave_grants??null,carryover:Number(e.carryover||0),currentGrant:Number(e.current_grant||0),nextGrantDate:e.next_grant_date||'',nextGrantDays:Number(e.next_grant_days||0),balanceStart:e.leave_balance_start||null}));
   state.requests=(reqs||[]).map(r=>({id:r.id,employeeId:r.employee_id,name:r.employee_name,dept:r.dept||'',date:r.leave_date,unit:r.leave_unit||'day',hours:Number(r.leave_hours||0),equiv:Number(r.equivalent_days||r.leave_type||1),reason:r.reason||'',status:r.status,createdAt:r.created_at,approvedAt:r.approved_at,cancelled:r.cancelled||false}));
   state.fiveDayTarget=Number(settings?.[0]?.five_day_target||5);state.notifications=notifs||[];renderAll()
  }catch(e){console.error(e);alert('同期に失敗しました: '+cleanErr(e))}
@@ -387,6 +405,7 @@ function leaveLedger(e,asOf=isoToday(),candidate=null){
  rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt||'').localeCompare(String(b.createdAt||''))||String(a.id).localeCompare(String(b.id)));
  const shortages=[];
  for(const r of rows){
+  if(e.balanceStart&&r.date<e.balanceStart)continue;
   let needed=Number(r.equiv||0);
   for(const g of grants){
    if(g.date>r.date||(g.startsOn||g.date)>r.date||g.expires<r.date)continue;
@@ -397,14 +416,15 @@ function leaveLedger(e,asOf=isoToday(),candidate=null){
  }
  return {grants,shortages,available:roundDays(grants.filter(g=>g.date<=asOf&&(g.startsOn||g.date)<=asOf&&g.expires>=asOf).reduce((n,g)=>n+g.remaining,0))};
 }
-function balance(e,date=isoToday()){return leaveLedger(e,date).available}
+function balance(e,date=isoToday()){return e.balanceStart&&date<e.balanceStart?0:leaveLedger(e,date).available}
 function canAllocate(e,r){
+ if(e.balanceStart&&r.date<e.balanceStart)return false;
  const before=leaveLedger(e,r.date),after=leaveLedger(e,r.date,r);
  return !after.shortages.some(s=>s.id===r.id||s.days>(before.shortages.find(b=>b.id===s.id)?.days||0));
 }
 let editingGrants=[];
 function renderGrantEditor(){
- $('grantEditor').innerHTML=editingGrants.map((g,i)=>`<div class="grid4" style="margin:10px 0"><div><label>付与日</label><input type="date" value="${esc(g.date)}" onchange="editingGrants[${i}].date=this.value"></div><div><label>有効期限（当日まで）</label><input type="date" value="${esc(g.expires)}" onchange="editingGrants[${i}].expires=this.value"></div><div><label>付与日数${g.startsOn?'（期首繰越残数）':''}</label><input type="number" min="0" step="any" value="${g.days}" onchange="editingGrants[${i}].days=Number(this.value)"></div><div><label>利用開始日</label><input type="date" value="${esc(g.startsOn||g.date)}" onchange="editingGrants[${i}].startsOn=this.value"><button type="button" class="ghost" onclick="editingGrants.splice(${i},1);renderGrantEditor()">削除</button></div></div>`).join('');
+ $('grantEditor').innerHTML=editingGrants.map((g,i)=>`<div class="grid4" style="margin:10px 0"><div><label>付与日</label><input type="date" value="${esc(g.date)}" onchange="editingGrants[${i}].date=this.value"></div><div><label>有効期限（当日まで）</label><input type="date" value="${esc(g.expires)}" onchange="editingGrants[${i}].expires=this.value"></div><div><label>付与日数${$('empBalanceMode').value==='balance'?'（基準日の残数）':g.startsOn?'（期首繰越残数）':''}</label><input type="number" min="0" step="any" value="${g.days}" onchange="editingGrants[${i}].days=Number(this.value)"></div><div><label>利用開始日</label><input type="date" value="${esc($('empBalanceMode').value==='balance'?(g.date>$('empBalanceStart').value?g.date:$('empBalanceStart').value):(g.startsOn||g.date))}" ${$('empBalanceMode').value==='balance'?'disabled':''} onchange="editingGrants[${i}].startsOn=this.value"><button type="button" class="ghost" onclick="editingGrants.splice(${i},1);renderGrantEditor()">削除</button></div></div>`).join('');
 }
 function addGrantRow(){const date=isoToday();editingGrants.push({date,expires:defaultExpiry(date),days:10});renderGrantEditor()}
 function validDate(v){return /^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+'T12:00:00'))&&new Date(v+'T12:00:00').getDate()===Number(v.slice(8))}
@@ -531,41 +551,117 @@ async function submitLeave(){
     if(btn){btn.disabled=false;btn.textContent='申請する'}
   }
 }
-function renderStatus(){
- const es=visibleEmployees(),old=$('statusEmployeeFilter').value;$('statusEmployeeFilter').innerHTML='<option value="">全件</option>'+es.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(old)$('statusEmployeeFilter').value=old;
- const f=$('statusEmployeeFilter').value,rows=visibleRequests().filter(r=>!r.cancelled&&(!f||r.employeeId===f));
- $('statusBody').innerHTML=rows.length?rows.map(r=>`<tr><td>${r.date}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${leaveLabel(r)}</td><td>${badge(r.status)}</td><td>${esc(r.reason)}</td><td>${r.status==='承認待ち'?`<button class="ghost" onclick="cancelRequest('${r.id}')">取消</button>`:''} <button class="ghost" onclick="printRequest('${r.id}')">PDF</button></td></tr>`).join(''):'<tr><td colspan="8">申請はありません。</td></tr>'
+function canManageRequest(r){
+ return !!r&&(isAdmin()||(!r.cancelled&&r.status==='承認待ち'&&visibleEmployees().some(e=>e.id===r.employeeId)));
 }
-async function cancelRequest(id){if(!confirm('この申請を取り消しますか？'))return;try{if(mode==='local'){const r=state.requests.find(x=>x.id===id);r.cancelled=true;localStorage.setItem(LOCALKEY,JSON.stringify(state))}else await sbFetch(`/rest/v1/leave_requests?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({cancelled:true})});await syncNow()}catch(e){alert(cleanErr(e))}}
+function renderStatus(){
+ const es=visibleEmployees(),old=$('statusEmployeeFilter').value;
+ $('statusEmployeeFilter').innerHTML='<option value="">全件</option>'+es.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');if(old)$('statusEmployeeFilter').value=old;
+ const f=$('statusEmployeeFilter').value,showDeleted=$('showDeletedRequests').checked;
+ const rows=visibleRequests().filter(r=>(showDeleted||!r.cancelled)&&(!f||r.employeeId===f));
+ $('statusBody').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${leaveLabel(r)}</td><td>${roundDays(Number(r.equiv))}日</td><td>${r.cancelled?'<span class="badge rejected">削除済み</span>':badge(r.status)}</td><td>${esc(r.reason)}</td><td><div class="actions">${canManageRequest(r)?r.cancelled?`<button class="secondary" onclick="restoreRequest('${esc(r.id)}')">復元</button>`:`<button class="secondary" onclick="openRequestEditor('${esc(r.id)}')">修正</button><button class="danger" onclick="deleteRequest('${esc(r.id)}')">削除</button>`:''}<button class="ghost" onclick="printRequest('${esc(r.id)}')">PDF</button></div></td></tr>`).join(''):'<tr><td colspan="8">申請はありません。</td></tr>';
+}
+function openRequestEditor(id){
+ const r=state.requests.find(r=>r.id===id);if(!canManageRequest(r)||r.cancelled)return;
+ showView('statusView');$('editRequestId').value=id;
+ $('editRequestEmployee').innerHTML=visibleEmployees().map(e=>`<option value="${esc(e.id)}">${esc(e.name)}（${esc(e.dept)}）</option>`).join('');
+ $('editRequestEmployee').value=r.employeeId;$('editRequestEmployee').disabled=!isAdmin();
+ $('editRequestDate').value=r.date;$('editRequestUnit').value=r.unit||'day';$('editRequestHours').value=r.hours||1;$('editRequestStatus').value=r.status;$('editRequestReason').value=r.reason||'';
+ $('requestEditor').classList.remove('hidden');updateRequestPreview();
+}
+function closeRequestEditor(){$('requestEditor').classList.add('hidden');$('editRequestId').value=''}
+function requestEditValues(){
+ const employee=employeeById($('editRequestEmployee').value),unit=$('editRequestUnit').value,hours=unit==='hour'?Number($('editRequestHours').value):0;
+ const equiv=unit==='day'?1:unit==='half'?.5:hours/Number(employee?.dailyHours||8);
+ return {employee,unit,hours,equiv:roundDays(equiv),date:$('editRequestDate').value};
+}
+function updateRequestPreview(){
+ const v=requestEditValues();$('editRequestHoursWrap').classList.toggle('hidden',v.unit!=='hour');
+ $('editRequestPreview').textContent=`日数換算：${Number.isFinite(v.equiv)?v.equiv:'--'}日。保存すると残数・カレンダー・集計を再計算します。`+(v.employee?.balanceStart&&v.date<v.employee.balanceStart?' 基準日前の取得は初期残数に反映済みとして扱い、現在の残数には影響しません。':'');
+}
+const requestWrites=new Set();
+async function persistRequest(r,changes){
+ if(!canManageRequest(r))throw Error('この申請を変更する権限がありません。');
+ if(requestWrites.has(r.id))throw Error('保存中です。しばらくお待ちください。');
+ requestWrites.add(r.id);
+ try{
+  if(mode!=='local'){
+   const map={employeeId:'employee_id',name:'employee_name',dept:'dept',date:'leave_date',unit:'leave_unit',hours:'leave_hours',equiv:'equivalent_days',reason:'reason',status:'status',cancelled:'cancelled',approvedAt:'approved_at'};
+   const payload={};for(const [key,value] of Object.entries(changes)){if(map[key])payload[map[key]]=value}
+   if('equiv' in changes)payload.leave_type=changes.equiv;
+   if('status' in changes)payload.approved_by=changes.status==='承認'?session?.user?.id||null:null;
+   const saved=await sbFetch(`/rest/v1/leave_requests?id=eq.${encodeURIComponent(r.id)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(payload)});
+   if(!Array.isArray(saved)||saved.length!==1)throw Error('更新できませんでした。申請の更新権限、または削除・変更されていないかを確認してください。');
+  }
+  Object.assign(r,changes);
+  if(mode==='local')localStorage.setItem(LOCALKEY,JSON.stringify(state));
+  await syncNow();
+ }finally{requestWrites.delete(r.id)}
+}
+async function saveRequestEdit(){
+ const button=$('saveRequestButton');if(button.disabled)return;button.disabled=true;
+ try{
+  const r=state.requests.find(r=>r.id===$('editRequestId').value);
+  if(!canManageRequest(r)||r.cancelled)throw Error('この申請は修正できません。');
+  const v=requestEditValues(),status=isAdmin()?$('editRequestStatus').value:'承認待ち';
+  if(!v.employee||(!isAdmin()&&v.employee.id!==r.employeeId)||!validDate(v.date)||!['day','half','hour'].includes(v.unit)||!Number.isFinite(v.equiv)||v.equiv<=0||(v.unit==='hour'&&(v.hours<.5||!Number.isInteger(v.hours*2)))||!['承認待ち','承認','却下'].includes(status))throw Error('従業員・取得日・区分・取得時間を確認してください。');
+  const changes={employeeId:v.employee.id,name:v.employee.name,dept:v.employee.dept,date:v.date,unit:v.unit,hours:v.hours,equiv:v.equiv,reason:$('editRequestReason').value.trim(),status,approvedAt:status==='承認'?new Date().toISOString():null};
+  if(status!=='却下'&&!(isAdmin()&&v.employee.balanceStart&&v.date<v.employee.balanceStart)&&!canAllocate(v.employee,{...r,...changes}))throw Error('取得日時点の残数が不足するか、承認済みの予定に影響します。');
+  await persistRequest(r,changes);closeRequestEditor();alert('申請を修正しました。');
+ }catch(e){alert('修正に失敗しました: '+cleanErr(e))}finally{button.disabled=false}
+}
+async function deleteRequest(id){
+ const r=state.requests.find(r=>r.id===id);if(!canManageRequest(r)||r.cancelled)return;
+ if(!confirm(`${r.date} ${r.name} の申請を削除しますか？残数と集計から除外します。削除済み一覧から管理者が復元できます。`))return;
+ try{await persistRequest(r,{cancelled:true});if($('editRequestId').value===id)closeRequestEditor();alert('申請を削除しました。')}catch(e){alert('削除に失敗しました: '+cleanErr(e))}
+}
+async function restoreRequest(id){
+ const r=state.requests.find(r=>r.id===id);if(!isAdmin()||!r?.cancelled)return;
+ const e=employeeById(r.employeeId);
+ if(r.status==='承認'&&(!e||(!(e.balanceStart&&r.date<e.balanceStart)&&!canAllocate(e,r)))){alert('残数不足のため復元できません。付与履歴を確認してください。');return}
+ if(!confirm('この申請を削除前の状態に復元しますか？'))return;
+ try{await persistRequest(r,{cancelled:false});alert('申請を復元しました。')}catch(e){alert('復元に失敗しました: '+cleanErr(e))}
+}
+async function cancelRequest(id){return deleteRequest(id)}
+
 function moveMonth(n){calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()+n,1);renderCalendar()}
 function renderCalendar(){
  const y=calCursor.getFullYear(),m=calCursor.getMonth();$('calTitle').textContent=`${y}年 ${m+1}月`;const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());let html='';
  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const leaves=state.requests.filter(r=>r.status==='承認'&&!r.cancelled&&r.date===ds);html+=`<div class="day ${d.getMonth()!==m?'other':''}"><div class="daynum">${d.getDate()}</div>${leaves.map(r=>`<span class="leave-chip">${esc(r.name)} ${leaveLabel(r)}</span>`).join('')}</div>`}$('calendarGrid').innerHTML=html
 }
 function openEmployeeForm(id=''){
- if(!isAdmin())return;$('employeeForm').classList.remove('hidden');$('editEmployeeId').value=id;
+ if(!isAdmin())return;showView('employeesView');$('employeeForm').classList.remove('hidden');$('editEmployeeId').value=id;$('employeeFormTitle').textContent=id?'従業員情報・有給残数の編集':'従業員・有給の初期設定';
  const e=employeeById(id);$('empName').value=e?.name||'';$('empDept').value=e?.dept||'';$('empEmail').value=e?.email||'';$('empHireDate').value=e?.hireDate||'';$('empDailyHours').value=e?.dailyHours??8;$('empNextGrant').value=e?.nextGrantDate||'';$('empNextGrantDays').value=e?.nextGrantDays??10;
- editingGrants=e?employeeGrants(e):[{date:isoToday(),expires:defaultExpiry(isoToday()),days:10}];renderGrantEditor();
+ editingGrants=e?employeeGrants(e):[{date:isoToday(),expires:defaultExpiry(isoToday()),days:0}];$('empBalanceMode').value=e&&!e.balanceStart?'history':'balance';$('empBalanceStart').value=e?.balanceStart||isoToday();updateBalanceMode();
+}
+function updateBalanceMode(){
+ const isBalance=$('empBalanceMode').value==='balance';$('empBalanceStartWrap').classList.toggle('hidden',!isBalance);
+ $('balanceModeHelp').textContent=isBalance?'基準日の取得前に残っている日数を、付与日・有効期限ごとに入力してください。基準日より前の取得は差し引きません。初期設定後は、基準日と日数をそのままにして申請を登録します。':'各付与の取得前の日数を入力します。承認済みの取得を自動で差し引きます。';renderGrantEditor();
 }
 function closeEmployeeForm(){$('employeeForm').classList.add('hidden')}
+let employeeSaving=false;
 async function saveEmployee(){
- if(!isAdmin())return;
+ if(!isAdmin()||employeeSaving)return;employeeSaving=true;$('saveEmployeeButton').disabled=true;
  try{
-  validateGrants(editingGrants);
+  const balanceStart=$('empBalanceMode').value==='balance'?$('empBalanceStart').value:null;
+  if($('empBalanceMode').value==='balance'&&!validDate(balanceStart))throw Error('残数の基準日を入力してください。');
+  const grants=editingGrants.map(g=>balanceStart?{...g,startsOn:g.date>balanceStart?g.date:balanceStart}:{...g});
+  validateGrants(grants);
   const id=$('editEmployeeId').value,latest=[...editingGrants].sort((a,b)=>b.date.localeCompare(a.date))[0];
-  const row={name:$('empName').value.trim(),dept:$('empDept').value.trim(),email:$('empEmail').value.trim().toLowerCase(),hire_date:$('empHireDate').value||null,daily_work_hours:Number($('empDailyHours').value),grant_year:Number((latest?.date||isoToday()).slice(0,4)),carryover:0,current_grant:latest?.days||0,next_grant_date:$('empNextGrant').value||null,next_grant_days:Number($('empNextGrantDays').value),leave_grants:editingGrants.map(g=>({...g}))};
+  const row={name:$('empName').value.trim(),dept:$('empDept').value.trim(),email:$('empEmail').value.trim().toLowerCase(),hire_date:$('empHireDate').value||null,daily_work_hours:Number($('empDailyHours').value),grant_year:Number((latest?.date||isoToday()).slice(0,4)),carryover:0,current_grant:latest?.days||0,next_grant_date:$('empNextGrant').value||null,next_grant_days:Number($('empNextGrantDays').value),leave_grants:grants,leave_balance_start:balanceStart};
   if(!row.name||!Number.isFinite(row.daily_work_hours)||row.daily_work_hours<=0||!Number.isFinite(row.next_grant_days)||row.next_grant_days<0)throw Error('氏名・所定時間・次回付与日数を確認してください。');
-  const existing=employeeById(id);if(existing){const old=leaveLedger(existing).shortages,updated=leaveLedger({...existing,leaveGrants:row.leave_grants}).shortages;if(updated.some(s=>s.days>(old.find(b=>b.id===s.id)?.days||0)))throw Error('この変更では承認済みの取得に残数不足が生じます。付与履歴を確認してください。')}
+  if(!validDate(row.hire_date||''))throw Error('正しい入社日を入力してください。');if(row.next_grant_date&&!validDate(row.next_grant_date))throw Error('次回付与日を確認してください。');if(row.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email))throw Error('メールアドレスを確認してください。');
+  const existing=employeeById(id);if(existing){const old=leaveLedger(existing).shortages,updated=leaveLedger({...existing,leaveGrants:row.leave_grants,balanceStart}).shortages;if(updated.some(s=>s.days>(old.find(b=>b.id===s.id)?.days||0)))throw Error('この変更では承認済みの取得に残数不足が生じます。付与履歴を確認してください。')}
   if(mode==='local'){
-   const values={name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',dailyHours:row.daily_work_hours,grantYear:row.grant_year,carryover:0,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days,leaveGrants:row.leave_grants};
+   const values={name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',dailyHours:row.daily_work_hours,grantYear:row.grant_year,carryover:0,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days,leaveGrants:row.leave_grants,balanceStart};
    if(id)Object.assign(employeeById(id),values);else state.employees.push({id:crypto.randomUUID(),...values});
    localStorage.setItem(LOCALKEY,JSON.stringify(state));
-  }else await sbFetch(id?`/rest/v1/employees?id=eq.${id}`:'/rest/v1/employees',{method:id?'PATCH':'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
+  }else {const saved=await sbFetch(id?`/rest/v1/employees?id=eq.${encodeURIComponent(id)}`:'/rest/v1/employees',{method:id?'PATCH':'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(row)});if(!Array.isArray(saved)||saved.length!==1)throw Error('保存を確認できません。更新権限とデータを確認してください。');}
   closeEmployeeForm();await syncNow();
- }catch(e){alert('保存に失敗しました: '+cleanErr(e))}
+ }catch(e){alert('保存に失敗しました: '+cleanErr(e))}finally{employeeSaving=false;$('saveEmployeeButton').disabled=false}
 }
 function renderEmployees(){
- const es=visibleEmployees(),year=new Date().getFullYear();$('employeeBody').innerHTML=es.length?es.map(e=>{const used=usedDays(e.id),five=usedDays(e.id,year),remain=Math.max(0,balance(e)),pct=Math.min(100,(five/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td>${e.hireDate||''}</td><td>${e.dailyHours}h</td><td colspan="2">${grantSummary(e)}</td><td>${used}</td><td><b>${remain}</b></td><td>${five}/${state.fiveDayTarget}<div class="progress"><span style="width:${pct}%"></span></div></td><td>${e.nextGrantDate||''}</td><td>${isAdmin()?`<button class="ghost" onclick="openEmployeeForm('${e.id}')">編集</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="10">従業員情報がありません。</td></tr>'
+ const es=visibleEmployees(),year=new Date().getFullYear();$('employeeBody').innerHTML=es.length?es.map(e=>{const used=usedDays(e.id),five=usedDays(e.id,year),remain=Math.max(0,balance(e)),pct=Math.min(100,(five/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td>${e.hireDate||''}</td><td>${e.dailyHours}h</td><td colspan="2">${grantSummary(e)}</td><td>${used}</td><td><b>${remain}</b>${e.balanceStart?`<div class="muted">基準日 ${esc(e.balanceStart)}</div>`:''}</td><td>${five}/${state.fiveDayTarget}<div class="progress"><span style="width:${pct}%"></span></div></td><td>${e.nextGrantDate||''}</td><td>${isAdmin()?`<button class="ghost" onclick="openEmployeeForm('${e.id}')">編集</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="10">従業員情報がありません。</td></tr>'
 }
 function renderAdmin(){
  const p=state.requests.filter(r=>r.status==='承認待ち'&&!r.cancelled);$('pendingList').innerHTML=isAdmin()?(p.length?p.map(r=>`<div class="card" style="margin:8px 0;background:#fbfcfe"><div><b>${r.date}</b>　${esc(r.name)}（${esc(r.dept)}）</div><div class="muted" style="margin:6px 0">${leaveLabel(r)} ／ ${esc(r.reason||'理由なし')}</div><div class="actions"><button class="primary" onclick="decide('${r.id}','承認')">承認</button><button class="danger" onclick="decide('${r.id}','却下')">却下</button><button class="ghost" onclick="printRequest('${r.id}')">PDF</button></div></div>`).join(''):'承認待ちはありません。'):'';
