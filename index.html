@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2f5b">
 <link rel="manifest" href="manifest.webmanifest">
-<title>有給休暇管理 v5.4</title>
+<title>有給休暇管理 v5.5</title>
 <style>
 :root{--navy:#0b2f5b;--bg:#f5f7fb;--line:#d9e0ea;--ok:#e9f7ef;--warn:#fff7df;--bad:#fdecec;--text:#172033}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -28,7 +28,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
 </style>
 </head>
 <body>
-<header>有給休暇管理 v5.4</header>
+<header>有給休暇管理 v5.5</header>
 <main>
 
 <div id="authBar" class="authbar hidden no-print">
@@ -69,8 +69,8 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <h3 style="margin-top:0">有給休暇を申請</h3>
   <div class="grid">
    <div><label>従業員</label><select id="applyEmployee" onchange="refreshApplyBalance()"></select></div>
-   <div><label>現在の利用可能残数</label><input id="applyBalance" readonly></div>
-   <div><label>取得日</label><input id="leaveDate" type="date"></div>
+   <div><label>取得日時点の利用可能残数</label><input id="applyBalance" readonly></div>
+   <div><label>取得日</label><input id="leaveDate" type="date" onchange="refreshApplyBalance()"></div>
    <div><label>区分</label><select id="leaveUnit" onchange="toggleHourInput()"><option value="day">1日</option><option value="half">半日</option><option value="hour">時間単位</option></select></div>
 <div id="hourWrap" class="hidden"><label>取得時間</label><input id="leaveHours" type="number" min="0.5" step="0.5" value="1" oninput="updatePreview()"></div>
   </div>
@@ -102,13 +102,15 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
    <input type="hidden" id="editEmployeeId">
    <div class="grid3">
     <div><label>氏名</label><input id="empName"></div><div><label>所属</label><input id="empDept"></div><div><label>メール</label><input id="empEmail" type="email"></div>
-    <div><label>入社日</label><input id="empHireDate" type="date"></div><div><label>1日の所定時間</label><input id="empDailyHours" type="number" min="1" step="0.5" value="8"></div><div><label>付与年度</label><input id="empGrantYear" type="number" min="2020" max="2100"></div>
-<div><label>前年繰越</label><input id="empCarry" type="number" min="0" step="0.125" value="0"></div><div><label>今年付与</label><input id="empGrant" type="number" min="0" step="0.5" value="10"></div>
+    <div><label>入社日</label><input id="empHireDate" type="date"></div><div><label>1日の所定時間</label><input id="empDailyHours" type="number" min="1" step="0.5" value="8"></div>
+
     <div><label>次回付与日</label><input id="empNextGrant" type="date"></div><div><label>次回付与日数</label><input id="empNextGrantDays" type="number" min="0" step="0.5" value="10"></div>
    </div>
+   <div class="notice">新しく付与された有給から先に消化します。有効期限当日まで利用できます。付与日数は取得分を引く前の数です。旧データの前年繰越は、当年の付与日から利用する期首残数として扱います。旧データの日付は1月1日を仮設定するため、初回保存前に確認してください。</div>
+   <div id="grantEditor"></div><button class="secondary" onclick="addGrantRow()">＋ 付与履歴を追加</button>
    <div class="actions" style="margin-top:10px"><button class="primary" onclick="saveEmployee()">保存</button><button class="ghost" onclick="closeEmployeeForm()">キャンセル</button></div>
   </div>
-  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>氏名</th><th>所属</th><th>入社日</th><th>所定時間</th><th>前年繰越</th><th>今年付与</th><th>取得</th><th>残数</th><th>5日取得</th><th>次回付与</th><th>操作</th></tr></thead><tbody id="employeeBody"></tbody></table></div>
+  <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>氏名</th><th>所属</th><th>入社日</th><th>所定時間</th><th colspan="2">付与別残数・有効期限</th><th>取得</th><th>残数</th><th>5日取得</th><th>次回付与</th><th>操作</th></tr></thead><tbody id="employeeBody"></tbody></table></div>
  </div>
 </section>
 
@@ -126,7 +128,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <div id="annualSummary" style="margin-top:12px"></div>
   <h4>従業員別 5日取得状況</h4>
   <div class="table-wrap"><table><thead><tr><th>氏名</th><th>所属</th><th>承認済み取得</th><th>5日まで</th><th>進捗</th></tr></thead><tbody id="fiveDayBody"></tbody></table></div>
-  <div class="actions admin-only" style="margin-top:12px"><button class="secondary" onclick="runAnnualCarryover()">年度繰越を実行</button></div>
+  <div class="actions admin-only" style="margin-top:12px"><button class="secondary" onclick="runAnnualCarryover()">次回付与を実行</button></div>
  </div>
 </section>
 
@@ -135,7 +137,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:grid;g
   <h3 style="margin-top:0">クラウド接続設定</h3>
   <div class="grid"><div><label>Supabase Project URL</label><input id="sbUrl" placeholder="https://xxxxx.supabase.co"></div><div><label>Supabase anon key</label><textarea id="sbKey" style="min-height:100px"></textarea></div></div>
   <div class="actions" style="margin-top:11px"><button class="primary" onclick="saveCloudConfig()">保存</button><button class="ghost" onclick="testCloud()">接続テスト</button><button class="ghost" onclick="showView('loginView')">ログインへ戻る</button></div>
-  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.4では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
+  <div class="notice">Supabase接続設定は共通保存キーへ自動移行します。v5.5では旧形式の保存値も自動修復します。v4/v5の旧設定がこのブラウザに残っていれば自動で引き継ぎ、今後v6以降でも同じGitHub Pages上なら再入力不要です。</div>
  </div>
  <div class="card">
   <h3 style="margin-top:0">ローカルデータ移行</h3>
@@ -328,7 +330,7 @@ function logout(){
   session=null;profile=null;
   ['paidLeaveSession','paidLeaveSessionV4','paidLeaveSessionV5','paidLeaveSessionV6'].forEach(k=>localStorage.removeItem(k));
   $('authBar').classList.add('hidden');$('bottomNav').classList.add('hidden');showView('loginView')}
-function startLocalMode(){mode='local';profile={role:'admin',name:'ローカル管理者',email:''};state=JSON.parse(localStorage.getItem(LOCALKEY)||'{"employees":[],"requests":[],"fiveDayTarget":5}');enterApp()}
+function startLocalMode(){mode='local';profile={role:'admin',name:'ローカル管理者',email:''};state=JSON.parse(localStorage.getItem(LOCALKEY)||'{"employees":[],"requests":[],"fiveDayTarget":5}');for(const e of state.employees){e.grantYear??=Number(isoToday().slice(0,4));}localStorage.setItem(LOCALKEY,JSON.stringify(state));enterApp()}
 function enterApp(){$('authBar').classList.remove('hidden');$('bottomNav').classList.remove('hidden');$('authName').textContent=profile?.name||currentEmail()||'ユーザー';$('authRole').textContent=isAdmin()?'管理者':'従業員';$('authRole').className='badge '+(isAdmin()?'role-admin':'role-employee');document.querySelectorAll('.admin-only').forEach(x=>x.classList.toggle('hidden',!isAdmin()));showView('homeView')}
 function cleanErr(e){try{const o=JSON.parse(e.message);return o.msg||o.message||e.message}catch{return e.message}}
 
@@ -352,7 +354,7 @@ async function syncNow(){
    sbFetch('/rest/v1/app_settings?id=eq.1&select=*'),
    sbFetch('/rest/v1/notifications?select=*&order=created_at.desc')
   ]);
-  state.employees=(emps||[]).map(e=>({id:e.id,name:e.name,dept:e.dept||'',email:e.email||'',hireDate:e.hire_date||'',dailyHours:Number(e.daily_work_hours||8),grantYear:Number(e.grant_year||new Date().getFullYear()),carryover:Number(e.carryover||0),currentGrant:Number(e.current_grant||0),nextGrantDate:e.next_grant_date||'',nextGrantDays:Number(e.next_grant_days||0)}));
+  state.employees=(emps||[]).map(e=>({id:e.id,name:e.name,dept:e.dept||'',email:e.email||'',hireDate:e.hire_date||'',dailyHours:Number(e.daily_work_hours||8),grantYear:Number(e.grant_year||new Date().getFullYear()),leaveGrants:e.leave_grants??null,carryover:Number(e.carryover||0),currentGrant:Number(e.current_grant||0),nextGrantDate:e.next_grant_date||'',nextGrantDays:Number(e.next_grant_days||0)}));
   state.requests=(reqs||[]).map(r=>({id:r.id,employeeId:r.employee_id,name:r.employee_name,dept:r.dept||'',date:r.leave_date,unit:r.leave_unit||'day',hours:Number(r.leave_hours||0),equiv:Number(r.equivalent_days||r.leave_type||1),reason:r.reason||'',status:r.status,createdAt:r.created_at,approvedAt:r.approved_at,cancelled:r.cancelled||false}));
   state.fiveDayTarget=Number(settings?.[0]?.five_day_target||5);state.notifications=notifs||[];renderAll()
  }catch(e){console.error(e);alert('同期に失敗しました: '+cleanErr(e))}
@@ -362,7 +364,55 @@ function employeeById(id){return state.employees.find(e=>e.id===id)}
 function approvedForEmployee(id,year=null){return state.requests.filter(r=>r.employeeId===id&&r.status==='承認'&&!r.cancelled&&(!year||r.date.startsWith(year+'-')))}
 function usedDays(id,year=null){return approvedForEmployee(id,year).reduce((a,r)=>a+Number(r.equiv||0),0)}
 function leaveLabel(r){if(r.unit==='half')return'半日';if(r.unit==='hour')return`${r.hours}時間`;return'1日'}
-function balance(e){return Number(e.carryover||0)+Number(e.currentGrant||0)-usedDays(e.id)}
+// Dates are local calendar dates; expiry is inclusive. All calculations replay leave dates.
+const roundDays=n=>Math.round(n*1e8)/1e8;
+function shiftYear(date,years){
+ const [y,m,d]=date.split('-').map(Number),last=new Date(y+years,m,0).getDate();
+ return [y+years,String(m).padStart(2,'0'),String(Math.min(d,last)).padStart(2,'0')].join('-');
+}
+function defaultExpiry(date){const d=new Date(date+'T12:00:00');d.setFullYear(d.getFullYear()+2);d.setDate(d.getDate()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function employeeGrants(e){
+ if(Array.isArray(e.leaveGrants))return e.leaveGrants.map(g=>({...g}));
+ const year=Number(e.grantYear||isoToday().slice(0,4)),start=year+'-01-01';
+ return [
+  {date:(year-1)+'-01-01',startsOn:start,expires:year+'-12-31',days:Number(e.carryover||0)},
+  {date:start,expires:(year+1)+'-12-31',days:Number(e.currentGrant||0)}
+ ].filter(g=>g.days>0);
+}
+function leaveLedger(e,asOf=isoToday(),candidate=null){
+ const grants=employeeGrants(e).map((g,i)=>({...g,index:i,remaining:Number(g.days)}))
+   .sort((a,b)=>b.date.localeCompare(a.date)||b.index-a.index);
+ const rows=approvedForEmployee(e.id).filter(r=>!candidate||r.id!==candidate.id);
+ if(candidate)rows.push(candidate);
+ rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt||'').localeCompare(String(b.createdAt||''))||String(a.id).localeCompare(String(b.id)));
+ const shortages=[];
+ for(const r of rows){
+  let needed=Number(r.equiv||0);
+  for(const g of grants){
+   if(g.date>r.date||(g.startsOn||g.date)>r.date||g.expires<r.date)continue;
+   const taken=Math.min(g.remaining,needed);g.remaining=roundDays(g.remaining-taken);needed=roundDays(needed-taken);
+   if(needed<=0)break;
+  }
+  if(needed>0)shortages.push({id:r.id,date:r.date,days:needed});
+ }
+ return {grants,shortages,available:roundDays(grants.filter(g=>g.date<=asOf&&(g.startsOn||g.date)<=asOf&&g.expires>=asOf).reduce((n,g)=>n+g.remaining,0))};
+}
+function balance(e,date=isoToday()){return leaveLedger(e,date).available}
+function canAllocate(e,r){
+ const before=leaveLedger(e,r.date),after=leaveLedger(e,r.date,r);
+ return !after.shortages.some(s=>s.id===r.id||s.days>(before.shortages.find(b=>b.id===s.id)?.days||0));
+}
+let editingGrants=[];
+function renderGrantEditor(){
+ $('grantEditor').innerHTML=editingGrants.map((g,i)=>`<div class="grid4" style="margin:10px 0"><div><label>付与日</label><input type="date" value="${esc(g.date)}" onchange="editingGrants[${i}].date=this.value"></div><div><label>有効期限（当日まで）</label><input type="date" value="${esc(g.expires)}" onchange="editingGrants[${i}].expires=this.value"></div><div><label>付与日数${g.startsOn?'（期首繰越残数）':''}</label><input type="number" min="0" step="any" value="${g.days}" onchange="editingGrants[${i}].days=Number(this.value)"></div><div><label>利用開始日</label><input type="date" value="${esc(g.startsOn||g.date)}" onchange="editingGrants[${i}].startsOn=this.value"><button type="button" class="ghost" onclick="editingGrants.splice(${i},1);renderGrantEditor()">削除</button></div></div>`).join('');
+}
+function addGrantRow(){const date=isoToday();editingGrants.push({date,expires:defaultExpiry(date),days:10});renderGrantEditor()}
+function validDate(v){return /^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+'T12:00:00'))&&new Date(v+'T12:00:00').getDate()===Number(v.slice(8))}
+function validateGrants(grants){
+ for(const g of grants){if(!validDate(g.date)||!validDate(g.expires)||g.expires<g.date||!Number.isFinite(g.days)||g.days<0||(g.startsOn&&(!validDate(g.startsOn)||g.startsOn<g.date||g.startsOn>g.expires)))throw Error('付与日・有効期限・利用開始日・付与日数を確認してください。')}
+}
+function grantSummary(e){return leaveLedger(e).grants.map(g=>`<div>${esc(g.date)}付与：${g.expires<isoToday()?'失効 '+g.remaining:'残'+g.remaining}日<br><span class="muted">期限 ${esc(g.expires)}${g.expires<isoToday()?'（失効）':g.date>isoToday()?'（付与前）':''}</span></div>`).join('')||'付与なし'}
+
 
 function visibleEmployees(){
  if(isAdmin())return state.employees;
@@ -410,7 +460,7 @@ function renderApply(){
  const es=visibleEmployees();$('applyEmployee').innerHTML=es.length?es.map(e=>`<option value="${e.id}">${esc(e.name)}（${esc(e.dept||'')}）</option>`).join(''):'<option value="">従業員登録が必要です</option>';
  $('leaveDate').value=$('leaveDate').value||isoToday();refreshApplyBalance();toggleHourInput()
 }
-function refreshApplyBalance(){const e=employeeById($('applyEmployee').value);$('applyBalance').value=e?`${Math.max(0,balance(e))}日`:'--'}
+function refreshApplyBalance(){const e=employeeById($('applyEmployee').value);$('applyBalance').value=e?`${balance(e,$('leaveDate').value||isoToday())}日（承認済みの予定を差引）`:'--';updatePreview()}
 async function submitLeave(){
   const btn=document.querySelector('button[onclick="submitLeave()"]');
   if(btn?.disabled)return;
@@ -422,10 +472,10 @@ async function submitLeave(){
     const unit=$('leaveUnit')?.value||'day';
     const hours=unit==='hour'?Number($('leaveHours')?.value||0):0;
     const equiv=calcEquiv();
-    if(!e||!date||!Number.isFinite(equiv)||equiv<=0){
+    if(!e||!validDate(date)||!Number.isFinite(equiv)||equiv<=0){
       throw new Error('入力を確認してください。');
     }
-    if(balance(e)<equiv){
+    if(!canAllocate(e,{id:'candidate-'+Date.now(),employeeId:e.id,date,equiv,createdAt:new Date().toISOString()})){
       throw new Error('利用可能残数が不足しています。');
     }
     const reasonText=String($('reason')?.value||'').trim();
@@ -492,27 +542,38 @@ function renderCalendar(){
  const y=calCursor.getFullYear(),m=calCursor.getMonth();$('calTitle').textContent=`${y}年 ${m+1}月`;const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());let html='';
  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const leaves=state.requests.filter(r=>r.status==='承認'&&!r.cancelled&&r.date===ds);html+=`<div class="day ${d.getMonth()!==m?'other':''}"><div class="daynum">${d.getDate()}</div>${leaves.map(r=>`<span class="leave-chip">${esc(r.name)} ${leaveLabel(r)}</span>`).join('')}</div>`}$('calendarGrid').innerHTML=html
 }
-function openEmployeeForm(id=''){if(!isAdmin())return;$('employeeForm').classList.remove('hidden');$('editEmployeeId').value=id;const e=employeeById(id);$('empName').value=e?.name||'';$('empDept').value=e?.dept||'';$('empEmail').value=e?.email||'';$('empHireDate').value=e?.hireDate||'';$('empDailyHours').value=e?.dailyHours??8;$('empGrantYear').value=e?.grantYear??new Date().getFullYear();$('empCarry').value=e?.carryover??0;$('empGrant').value=e?.currentGrant??10;$('empNextGrant').value=e?.nextGrantDate||'';$('empNextGrantDays').value=e?.nextGrantDays??10}
+function openEmployeeForm(id=''){
+ if(!isAdmin())return;$('employeeForm').classList.remove('hidden');$('editEmployeeId').value=id;
+ const e=employeeById(id);$('empName').value=e?.name||'';$('empDept').value=e?.dept||'';$('empEmail').value=e?.email||'';$('empHireDate').value=e?.hireDate||'';$('empDailyHours').value=e?.dailyHours??8;$('empNextGrant').value=e?.nextGrantDate||'';$('empNextGrantDays').value=e?.nextGrantDays??10;
+ editingGrants=e?employeeGrants(e):[{date:isoToday(),expires:defaultExpiry(isoToday()),days:10}];renderGrantEditor();
+}
 function closeEmployeeForm(){$('employeeForm').classList.add('hidden')}
 async function saveEmployee(){
- if(!isAdmin())return;const id=$('editEmployeeId').value,row={name:$('empName').value.trim(),dept:$('empDept').value.trim(),email:$('empEmail').value.trim().toLowerCase(),hire_date:$('empHireDate').value||null,daily_work_hours:Number($('empDailyHours').value||8),grant_year:Number($('empGrantYear').value||new Date().getFullYear()),carryover:Number($('empCarry').value||0),current_grant:Number($('empGrant').value||0),next_grant_date:$('empNextGrant').value||null,next_grant_days:Number($('empNextGrantDays').value||0)};if(!row.name){alert('氏名を入力してください。');return}
+ if(!isAdmin())return;
  try{
-  if(mode==='local'){if(id){Object.assign(employeeById(id),{name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',carryover:row.carryover,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days})}else state.employees.push({id:crypto.randomUUID(),name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',carryover:row.carryover,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days});localStorage.setItem(LOCALKEY,JSON.stringify(state))}
-  else if(id) await sbFetch(`/rest/v1/employees?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
-  else await sbFetch('/rest/v1/employees',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
-  closeEmployeeForm();await syncNow()
+  validateGrants(editingGrants);
+  const id=$('editEmployeeId').value,latest=[...editingGrants].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const row={name:$('empName').value.trim(),dept:$('empDept').value.trim(),email:$('empEmail').value.trim().toLowerCase(),hire_date:$('empHireDate').value||null,daily_work_hours:Number($('empDailyHours').value),grant_year:Number((latest?.date||isoToday()).slice(0,4)),carryover:0,current_grant:latest?.days||0,next_grant_date:$('empNextGrant').value||null,next_grant_days:Number($('empNextGrantDays').value),leave_grants:editingGrants.map(g=>({...g}))};
+  if(!row.name||!Number.isFinite(row.daily_work_hours)||row.daily_work_hours<=0||!Number.isFinite(row.next_grant_days)||row.next_grant_days<0)throw Error('氏名・所定時間・次回付与日数を確認してください。');
+  const existing=employeeById(id);if(existing){const old=leaveLedger(existing).shortages,updated=leaveLedger({...existing,leaveGrants:row.leave_grants}).shortages;if(updated.some(s=>s.days>(old.find(b=>b.id===s.id)?.days||0)))throw Error('この変更では承認済みの取得に残数不足が生じます。付与履歴を確認してください。')}
+  if(mode==='local'){
+   const values={name:row.name,dept:row.dept,email:row.email,hireDate:row.hire_date||'',dailyHours:row.daily_work_hours,grantYear:row.grant_year,carryover:0,currentGrant:row.current_grant,nextGrantDate:row.next_grant_date||'',nextGrantDays:row.next_grant_days,leaveGrants:row.leave_grants};
+   if(id)Object.assign(employeeById(id),values);else state.employees.push({id:crypto.randomUUID(),...values});
+   localStorage.setItem(LOCALKEY,JSON.stringify(state));
+  }else await sbFetch(id?`/rest/v1/employees?id=eq.${id}`:'/rest/v1/employees',{method:id?'PATCH':'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
+  closeEmployeeForm();await syncNow();
  }catch(e){alert('保存に失敗しました: '+cleanErr(e))}
 }
 function renderEmployees(){
- const es=visibleEmployees(),year=new Date().getFullYear();$('employeeBody').innerHTML=es.length?es.map(e=>{const used=usedDays(e.id),five=usedDays(e.id,year),remain=Math.max(0,balance(e)),pct=Math.min(100,(five/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td>${e.hireDate||''}</td><td>${e.dailyHours}h</td><td>${e.carryover}</td><td>${e.currentGrant}</td><td>${used}</td><td><b>${remain}</b></td><td>${five}/${state.fiveDayTarget}<div class="progress"><span style="width:${pct}%"></span></div></td><td>${e.nextGrantDate||''}</td><td>${isAdmin()?`<button class="ghost" onclick="openEmployeeForm('${e.id}')">編集</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="10">従業員情報がありません。</td></tr>'
+ const es=visibleEmployees(),year=new Date().getFullYear();$('employeeBody').innerHTML=es.length?es.map(e=>{const used=usedDays(e.id),five=usedDays(e.id,year),remain=Math.max(0,balance(e)),pct=Math.min(100,(five/Math.max(.5,state.fiveDayTarget))*100);return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td>${e.hireDate||''}</td><td>${e.dailyHours}h</td><td colspan="2">${grantSummary(e)}</td><td>${used}</td><td><b>${remain}</b></td><td>${five}/${state.fiveDayTarget}<div class="progress"><span style="width:${pct}%"></span></div></td><td>${e.nextGrantDate||''}</td><td>${isAdmin()?`<button class="ghost" onclick="openEmployeeForm('${e.id}')">編集</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="10">従業員情報がありません。</td></tr>'
 }
 function renderAdmin(){
  const p=state.requests.filter(r=>r.status==='承認待ち'&&!r.cancelled);$('pendingList').innerHTML=isAdmin()?(p.length?p.map(r=>`<div class="card" style="margin:8px 0;background:#fbfcfe"><div><b>${r.date}</b>　${esc(r.name)}（${esc(r.dept)}）</div><div class="muted" style="margin:6px 0">${leaveLabel(r)} ／ ${esc(r.reason||'理由なし')}</div><div class="actions"><button class="primary" onclick="decide('${r.id}','承認')">承認</button><button class="danger" onclick="decide('${r.id}','却下')">却下</button><button class="ghost" onclick="printRequest('${r.id}')">PDF</button></div></div>`).join(''):'承認待ちはありません。'):'';
  renderAnnual()
 }
 async function decide(id,status){
- if(!isAdmin())return;const r=state.requests.find(x=>x.id===id),e=employeeById(r?.employeeId);if(!r)return;if(status==='承認'&&(!e||balance(e)<Number(r.equiv))){alert('残日数が不足しています。');return}
- try{await sbFetch(`/rest/v1/leave_requests?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status,approved_at:new Date().toISOString(),approved_by:session.user.id})});
+ if(!isAdmin())return;const r=state.requests.find(x=>x.id===id),e=employeeById(r?.employeeId);if(!r)return;if(status==='承認'&&(!e||!canAllocate(e,r))){alert('残日数が不足しています。');return}
+ try{if(mode==='local'){Object.assign(r,{status,approvedAt:new Date().toISOString()});await syncNow();return}await sbFetch(`/rest/v1/leave_requests?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status,approved_at:new Date().toISOString(),approved_by:session.user.id})});
  if(e?.email)await sbFetch('/rest/v1/notifications',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({recipient_email:e.email,title:`有給申請：${status}`,message:`${r.date} ${leaveLabel(r)} の申請が${status}になりました。`,leave_request_id:r.id})});
  await syncNow()}catch(e){alert(cleanErr(e))}
 }
@@ -537,7 +598,25 @@ function myNotifications(){const m=(session?.user?.email||'').toLowerCase();retu
 function renderNotifCount(){if($('notifCount'))$('notifCount').textContent=myNotifications().filter(n=>!n.is_read).length}
 function renderNotifications(){const rows=myNotifications();notificationsList.innerHTML=rows.length?rows.map(n=>`<div style="padding:10px 0;border-bottom:1px solid #ddd"><b>${esc(n.title)}</b><div>${esc(n.message)}</div><div class="muted">${new Date(n.created_at).toLocaleString('ja-JP')}</div></div>`).join(''):'通知はありません。';renderNotifCount()}
 async function markAllRead(){for(const n of myNotifications().filter(x=>!x.is_read))await sbFetch(`/rest/v1/notifications?id=eq.${n.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({is_read:true})});await syncNow();renderNotifications()}
-async function runAnnualCarryover(){if(!isAdmin())return;const y=new Date().getFullYear();if(!confirm(`${y}年度への繰越処理を実行しますか？`))return;for(const e of state.employees){if(e.grantYear>=y)continue;await sbFetch(`/rest/v1/employees?id=eq.${e.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({carryover:Math.max(0,balance(e)),current_grant:Number(e.nextGrantDays||e.currentGrant||0),grant_year:y})})}await syncNow();alert('年度繰越を実行しました。')}
+async function runAnnualCarryover(){
+ if(!isAdmin())return;
+ const today=isoToday(),due=state.employees.filter(e=>e.nextGrantDate&&e.nextGrantDate<=today);
+ if(!due.length){alert('付与日を迎えた従業員はいません。');return}
+ if(!confirm('次回付与日を迎えた従業員に1回分を付与します。前年分の期限は延長しません。実行しますか？'))return;
+ try{
+  for(const e of due){
+   const date=e.nextGrantDate,grants=employeeGrants(e);
+   validateGrants(grants);
+   if(!Number.isFinite(Number(e.nextGrantDays))||Number(e.nextGrantDays)<0)throw Error('次回付与日数を確認してください。');
+   if(grants.some(g=>g.date===date))throw Error(e.name+'：同じ付与日の履歴があります。従業員編集で確認してください。');
+   grants.push({date,expires:defaultExpiry(date),days:Number(e.nextGrantDays)});
+   const next=shiftYear(date,1);
+   if(mode==='local')Object.assign(e,{leaveGrants:grants,grantYear:Number(date.slice(0,4)),carryover:0,currentGrant:Number(e.nextGrantDays),nextGrantDate:next});
+   else await sbFetch(`/rest/v1/employees?id=eq.${e.id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({leave_grants:grants,grant_year:Number(date.slice(0,4)),carryover:0,current_grant:Number(e.nextGrantDays),next_grant_date:next})});
+  }
+  await syncNow();alert('付与しました。複数年分が未処理の場合は次回付与日を確認してください。');
+ }catch(e){await syncNow();alert('付与処理を中断しました: '+cleanErr(e))}
+}
 function renderAll(){renderHome();renderApply();renderStatus();renderCalendar();renderEmployees();renderAdmin();renderNotifCount()}
 
 (async function init(){
@@ -562,6 +641,8 @@ function renderAll(){renderHome();renderApply();renderStatus();renderCalendar();
   showView('loginView');
  }
 })();
+setInterval(()=>{if(profile&&document.visibilityState==='visible'){renderEmployees();refreshApplyBalance();renderHome()}},60000);
+document.addEventListener('visibilitychange',()=>{if(profile&&document.visibilityState==='visible'){renderEmployees();refreshApplyBalance();renderHome()}});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js');
 </script>
 </body>
